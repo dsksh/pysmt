@@ -445,6 +445,42 @@ class SmtLibParser(object):
                             'select':self._operator_adapter(mgr.Select),
                             'store':self._operator_adapter(mgr.Store),
                             'as':self._enter_smtlib_as,
+                            # FloatingPoint
+                            #'roundNearestTiesToEven':self._operator_adapter(mgr.FPRNE),
+                            #'roundNearestTiesToAway':self._operator_adapter(mgr.FPRNA),
+                            #'roundTowardPositive':self._operator_adapter(mgr.FPRTP),
+                            #'roundTowardNegative':self._operator_adapter(mgr.FPRTN),
+                            #'roundTowardZero':self._operator_adapter(mgr.FPRTZ),
+                            #'RNE':self._operator_adapter(mgr.FPRNE),
+                            #'RNA':self._operator_adapter(mgr.FPRNA),
+                            #'RTP':self._operator_adapter(mgr.FPRTP),
+                            #'RTN':self._operator_adapter(mgr.FPRTN),
+                            #'RTZ':self._operator_adapter(mgr.FPRTZ),
+                            'fp':self._operator_adapter(mgr.FP),
+                            'fp.abs':self._operator_adapter(mgr.FPAbs),
+                            'fp.neg':self._operator_adapter(mgr.FPNeg),
+                            'fp.add':self._operator_adapter(mgr.FPAdd),
+                            'fp.sub':self._operator_adapter(mgr.FPSub),
+                            'fp.mul':self._operator_adapter(mgr.FPMul),
+                            'fp.div':self._operator_adapter(mgr.FPDiv),
+                            'fp.fma':self._operator_adapter(mgr.FPFMA),
+                            'fp.sqrt':self._operator_adapter(mgr.FPSqrt),
+                            'fp.rem':self._operator_adapter(mgr.FPRem),
+                            'fp.roundToIntegral':self._operator_adapter(mgr.FPRoundToIntegral),
+                            'fp.min':self._operator_adapter(mgr.FPMin),
+                            'fp.max':self._operator_adapter(mgr.FPMax),
+                            'fp.leq':self._operator_adapter(mgr.FPLEQ),
+                            'fp.lt':self._operator_adapter(mgr.FPLT),
+                            'fp.geq':self._operator_adapter(mgr.FPGEQ),
+                            'fp.gt':self._operator_adapter(mgr.FPGT),
+                            'fp.eq':self._operator_adapter(mgr.FPEQ),
+                            'fp.isNormal':self._operator_adapter(mgr.FPIsNormal),
+                            'fp.isSubnormal':self._operator_adapter(mgr.FPIsSubnormal),
+                            'fp.isZero':self._operator_adapter(mgr.FPIsZero),
+                            'fp.isInfinite':self._operator_adapter(mgr.FPIsInfinite),
+                            'fp.isNaN':self._operator_adapter(mgr.FPIsNaN),
+                            'fp.isNegative':self._operator_adapter(mgr.FPIsNegative),
+                            'fp.isPositive':self._operator_adapter(mgr.FPIsPositive),
                             }
 
         # Command tokens
@@ -592,6 +628,46 @@ class SmtLibParser(object):
                                        "'%s'" % op, tokens.pos_info)
             fun = mgr.BV(v, width)
 
+        # For FloatingPoint
+
+        elif  op == "+oo" or op == "-oo" or op == "NaN" or \
+              op == "+zero" or op == "-zero" or \
+              op == "to_fp" or op == "to_fp_unsigned":
+            seb = self.parse_atom(tokens, "expression")
+            ssb = self.parse_atom(tokens, "expression")
+            try:
+                eb = int(seb)
+                sb = int(ssb)
+            except ValueError:
+                raise PysmtSyntaxError("Expected number in '_ [fp-related]' expression: ",
+                                       tokens.pos_info)
+            if op == "+oo":
+                fun = mgr.FPPositiveInfinity(eb, sb)
+            elif op == "-oo": 
+                fun = mgr.FPNegativeInfinity(eb, sb)
+            elif op == "NaN":
+                fun = mgr.FPNaN(eb, sb)
+            elif op == "+zero":
+                fun = mgr.FPPositiveZero(eb, sb)
+            elif op == "-zero":
+                fun = mgr.FPNegativeZero(eb, sb)
+            elif op == "to_fp":
+                fun = lambda rm, f=None: mgr.FPToFp(eb, sb, rm, f)
+            elif op == "to_fp_unsigned":
+                fun = lambda rm, f: mgr.FPToFpUnsigned(eb, sb, rm, f)
+
+        elif op == "fp.to_ubv" or op == "fp.to_sbv":
+            sm = self.parse_atom(tokens, "expression")
+            try:
+                m = int(sm)
+            except ValueError:
+                raise PysmtSyntaxError("Expected number in '_ to_ubv' expression: ",
+                                       tokens.pos_info)
+            if op == "fp.to_ubv":
+                fun = lambda rm, f: mgr.FPToUbv(m, rm, f)
+            elif op == "fp.to_sbv":
+                fun = lambda rm, f: mgr.FPToSbv(m, rm, f)
+
         else:
             raise PysmtSyntaxError("Unexpected '_' expression '%s'" % op,
                                    tokens.pos_info)
@@ -655,6 +731,16 @@ class SmtLibParser(object):
                 val = token[1:-1]
                 val = val.replace('""', '"')
                 res = mgr.String(val)
+            elif token == "roundNearestTiesToEven" or token == "RNE":
+                res = mgr.FPRNE()
+            elif token == "roundNearestTiesToAway" or token == "RNA":
+                res = mgr.FPRNA()
+            elif token == "roundTowardPositive" or token == "RTP":
+                res = mgr.FPRTP()
+            elif token == "roundTowardNegative" or token == "RTN":
+                res = mgr.FPRTN()
+            elif token == "roundTowardZero" or token == "RTZ":
+                res = mgr.FPRTZ()
             else:
                 # it could be a number or a string
                 try:
@@ -936,21 +1022,43 @@ class SmtLibParser(object):
                 ts = tokens.consume("Unexpected end of stream in %s command." % \
                                             command)
                 if ts != "BitVec":
+                    size = 0
+                    dim = tokens.consume()
+                    try:
+                        size = int(dim)
+                    except ValueError:
+                        raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
+                                               (dim, command),
+                                               tokens.pos_info)
+    
+                    self.consume_closing(tokens, command)
+                    res = self.env.type_manager.BVType(size)
+
+                elif ts == "FloatingPoint":
+                    eb = 0
+                    teb = tokens.consume()
+                    try:
+                        eb = int(teb)
+                    except ValueError:
+                        raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
+                                               (teb, command),
+                                               tokens.pos_info)
+                    sb = 0
+                    tsb = tokens.consume()
+                    try:
+                        sb = int(tsb)
+                    except ValueError:
+                        raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
+                                               (tsb, command),
+                                               tokens.pos_info)
+    
+                    self.consume_closing(tokens, command)
+                    res = self.env.type_manager.FPType(eb, sb)
+
+                else:
                     raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
                                            (ts, command),
                                            tokens.pos_info)
-
-                size = 0
-                dim = tokens.consume()
-                try:
-                    size = int(dim)
-                except ValueError:
-                    raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
-                                           (dim, command),
-                                           tokens.pos_info)
-
-                self.consume_closing(tokens, command)
-                res = self.env.type_manager.BVType(size)
             else:
                 # It must be a custom-defined type
                 base_type = self.cache.get(op)
@@ -986,6 +1094,16 @@ class SmtLibParser(object):
             res = self.env.type_manager.REAL()
         elif var == "String":
             res = self.env.type_manager.STRING()
+        elif var == "RoundingMode":
+            res = self.env.type_manager.RM()
+        elif var == "Float16":
+            res = self.env.type_manager.FPType(5, 11)
+        elif var == "Float32":
+            res = self.env.type_manager.FPType(8, 24)
+        elif var == "Float64":
+            res = self.env.type_manager.FPType(11, 53)
+        elif var == "Float128":
+            res = self.env.type_manager.FPType(15, 113)
         else:
             cached = self.cache.get(var)
             if cached is not None:

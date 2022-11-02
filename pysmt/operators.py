@@ -25,7 +25,7 @@ from itertools import chain
 from six.moves import xrange
 
 
-ALL_TYPES = list(xrange(0,94))
+ALL_TYPES = list(xrange(0, 102))
 
 (
 FORALL, EXISTS, AND, OR, NOT, IMPLIES, IFF, # Boolean Logic (0-6)
@@ -94,6 +94,9 @@ FP_LEQ, FP_LT, FP_EQ,                       # Floating-Point binary relations (8
 FP_IS_NORMAL, FP_IS_SUBNORMAL,              # Floating-Point normality tests (87- 88)
 FP_IS_ZERO, FP_IS_INFINITE, FP_IS_NAN,      # Floating-Point special value tests (89-91)
 FP_IS_NEGATIVE, FP_IS_POSITIVE,             # Floating-Point sign tests (92-93)
+FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,           # Floating-Point conversions (94-96)
+BV_TO_FP, FP_TO_FP,                         # Floating-Point conversions (97-98)
+REAL_TO_FP, INT_TO_FP, UINT_TO_FP,          # Floating-Point conversions (99-101)
 ) = ALL_TYPES
 
 QUANTIFIERS = frozenset([FORALL, EXISTS])
@@ -136,7 +139,10 @@ ARRAY_OPERATORS = frozenset([ARRAY_SELECT, ARRAY_STORE, ARRAY_VALUE])
 
 FP_OPERATORS = frozenset([FP_ABS, FP_NEG, FP_SQRT, FP_ROUND_TO_INTEGRAL,
                           FP_ADD, FP_SUB, FP_MUL, FP_DIV, FP_FMA, FP_REM,
-                          FP_MIN, FP_MAX])
+                          FP_MIN, FP_MAX,
+                          FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, 
+                          FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,
+                          BV_TO_FP])
 
 THEORY_OPERATORS = IRA_OPERATORS | BV_OPERATORS | ARRAY_OPERATORS | \
                    STR_OPERATORS | FP_OPERATORS
@@ -281,4 +287,12 @@ __OP_STR__ = {
     FP_IS_NAN: "FP_IS_NAN",
     FP_IS_NEGATIVE: "FP_IS_NEGATIVE",
     FP_IS_POSITIVE: "FP_IS_POSITIVE",
+    FP_TO_FP: "FP_TO_FP", 
+    REAL_TO_FP: "REAL_TO_FP", 
+    INT_TO_FP: "INT_TO_FP", 
+    UINT_TO_FP: "UINT_TO_FP", 
+    FP_TO_UBV: "FP_TO_UBV",
+    FP_TO_SBV: "FP_TO_SBV",
+    FP_TO_REAL: "FP_TO_REAL",
+    BV_TO_FP: "BV_TO_FP",
 }

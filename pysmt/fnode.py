@@ -44,14 +44,30 @@ from pysmt.operators import (FORALL, EXISTS, AND, OR, NOT, IMPLIES, IFF,
                              STR_TO_INT, INT_TO_STR,
                              STR_CHARAT,
                              ARRAY_SELECT, ARRAY_STORE, ARRAY_VALUE,
-                             ALGEBRAIC_CONSTANT)
+                             ALGEBRAIC_CONSTANT,
+                             FP_CONSTANT,
+                             FP_RNE, FP_RNA, FP_RTP, FP_RTN, FP_RTZ,
+                             FP_ABS, FP_NEG,
+                             FP_SQRT, FP_ROUND_TO_INTEGRAL,
+                             FP_ADD, FP_SUB, FP_MUL, FP_DIV,
+                             FP_FMA,
+                             FP_REM,
+                             FP_MIN, FP_MAX,
+                             FP_LEQ, FP_LT, FP_EQ,
+                             FP_IS_NORMAL, FP_IS_SUBNORMAL,
+                             FP_IS_ZERO, FP_IS_INFINITE, FP_IS_NAN,
+                             FP_IS_NEGATIVE, FP_IS_POSITIVE,
+                             BV_TO_FP, FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, 
+                             FP_TO_UBV, FP_TO_SBV, FP_TO_REAL)
 
 from pysmt.operators import  (BOOL_OPERATORS, THEORY_OPERATORS,
                               BV_OPERATORS, IRA_OPERATORS, ARRAY_OPERATORS,
                               STR_OPERATORS,
+                              FP_OPERATORS,
+                              FP_PREDICATES,
                               RELATIONS, CONSTANTS)
 
-from pysmt.typing import BOOL, REAL, INT, BVType, STRING
+from pysmt.typing import BOOL, REAL, INT, BVType, STRING, FPType, RM
 from pysmt.decorators import deprecated, assert_infix_enabled
 from pysmt.utils import twos_complement
 from pysmt.constants import (Fraction, is_python_integer,
@@ -169,10 +185,23 @@ class FNode(object):
                 return False
             if _type.is_string_type() and self.node_type() != STR_CONSTANT:
                 return False
+            if _type.is_rm_type() and \
+                    self.node_type() != FP_RNE and self.node_type() != FP_RNA and \
+                    self.node_type() != FP_RTP and self.node_type() != FP_RTN and \
+                    self.node_type() != FP_RTZ:
+                return False
             if _type.is_bv_type():
                 if self.node_type() != BV_CONSTANT:
                     return False
                 if self._content.payload[1] != _type.width:
+                    return False
+            if _type.is_fp_type():
+                if self.node_type() != FP_CONSTANT:
+                    return False
+                # TODO
+                if self._content.args[1].bv_width() != _type.eb:
+                    return False
+                if self._content.args[2].bv_width()+1 != _type.sb:
                     return False
 
         if value is not None:
@@ -220,6 +249,20 @@ class FNode(object):
         Optionally, check that the constant has the given value.
         """
         return self.is_constant(STRING, value)
+
+    def is_fp_constant(self, value=None, eb=None, sb=None):
+        """Test whether the formula is a FloatingPoint constant.
+
+        Optionally, check that the constant has the given value.
+        """
+        if value is None and eb is None and sb is None:
+            return self.node_type() == FP_CONSTANT
+
+        if eb is None or sb is None:
+            return self.is_constant(value=value)
+        else:
+            return self.is_constant(_type=FPType(eb=eb, sb=sb),
+                                    value=value)
 
     def is_algebraic_constant(self):
         """Test whether the formula is an Algebraic Constant"""
@@ -487,6 +530,8 @@ class FNode(object):
             # This must be a select over an array with BV value type
             ty = self.arg(0).get_type()
             return ty.elem_type.width
+        elif self.is_fp_op():
+            return self._content.payload[0]
         else:
             # BV Operator
             assert self.is_bv_op(), "Unsupported method bv_width on %s" % self
@@ -511,6 +556,87 @@ class FNode(object):
         """Return the extension step for BVZext and BVSext."""
         assert self.is_bv_zext() or self.is_bv_sext()
         return self._content.payload[1]
+
+    # For FloatingPoint
+
+    def is_fprne(self):
+        """Test whether the node is the FPRNE operator."""
+        return self.node_type() == FPRNE
+
+    def is_fprna(self):
+        """Test whether the node is the FPRNA operator."""
+        return self.node_type() == FPRNA
+
+    def is_fprtp(self):
+        """Test whether the node is the FPRTP operator."""
+        return self.node_type() == FPRTP
+
+    def is_fprtn(self):
+        """Test whether the node is the FPRTN operator."""
+        return self.node_type() == FPRTN
+
+    def is_fprtz(self):
+        """Test whether the node is the FPRTZ operator."""
+        return self.node_type() == FPRTZ
+
+    def is_fp_op(self):
+        """Test whether the node is a FloatingPoint operator."""
+        return self.node_type() in FP_OPERATORS
+
+    def is_fp_pred(self):
+        """Test whether the node is a FloatingPoint predicate."""
+        return self.node_type() in FP_PREDICATES
+
+    def fp_eb(self):
+        """Return the FP exp of the formula."""
+        if self.is_fp_constant():
+            return self.arg(1).bv_width()
+        elif self.is_symbol():
+            assert self.symbol_type().is_fp_type()
+            return self.symbol_type().exp_width
+        elif self.is_function_application():
+            # Return width defined in the declaration
+            return self.function_name().symbol_type().return_type.exp_width
+        elif self.is_ite():
+            # Recursively call fp_eb on the left child
+            # (The right child has the same width if the node is well-formed)
+            width_l = self.arg(1).fp_eb()
+            return width_l
+        elif self.is_select():
+            # This must be a select over an array with BV value type
+            ty = self.arg(0).get_type()
+            return ty.elem_type.exp_width
+        else:
+            # FP Operator
+            assert self.is_fp_op(), "Unsupported method fp_eb on %s" % self
+            # TODO
+            return self._content.payload[0]
+            #return self.arg(1)._content.payload[1]
+
+    def fp_sb(self):
+        """Return the FP sig of the formula."""
+        if self.is_fp_constant():
+            return self.arg(2).bv_width()+1
+        elif self.is_symbol():
+            assert self.symbol_type().is_fp_type()
+            return self.symbol_type().sig_width
+        elif self.is_function_application():
+            # Return width defined in the declaration
+            return self.function_name().symbol_type().return_type.sig_width
+        elif self.is_ite():
+            # Recursively call fp_sb on the left child
+            # (The right child has the same width if the node is well-formed)
+            width_l = self.arg(1).fp_sb()
+            return width_l
+        elif self.is_select():
+            # This must be a select over an array with FP value type
+            ty = self.arg(0).get_type()
+            return ty.elem_type.sig_width
+        else:
+            # FP Operator
+            assert self.is_fp_op(), "Unsupported method fp_sb on %s" % self
+            # TODO
+            return self._content.payload[1]
 
     def __str__(self):
         return self.serialize(threshold=5)
@@ -568,6 +694,9 @@ class FNode(object):
         assert self.is_constant()
         if self.node_type() == BV_CONSTANT:
             return self._content.payload[0]
+        if self.node_type() == FP_CONSTANT:
+            #return self._content.payload[0]
+            return self.args()
         return self._content.payload
 
     def constant_type(self):
@@ -580,6 +709,8 @@ class FNode(object):
             return BOOL
         elif self.node_type() == STR_CONSTANT:
             return STRING
+        elif self.node_type() == FP_CONSTANT:
+            return FPType(eb=self.fp_eb(), sb=self.fp_sb())
         else:
             assert self.node_type() == BV_CONSTANT,\
                 "Unsupported method constant_type '%s'" % self
@@ -849,6 +980,34 @@ class FNode(object):
 
     def Store(self, index, value):
         return _mgr().Store(self, index, value)
+
+    # For FloatingPoint
+
+    def FPAbs(self, right): return self._apply_infix(_mgr().FPAbs)
+    def FPNeg(self, right): return self._apply_infix(_mgr().FPNeg)
+    def FPAdd(self, right): return self._apply_infix(_mgr().FPAdd)
+    def FPSub(self, right): return self._apply_infix(_mgr().FPSub)
+    def FPMul(self, right): return self._apply_infix(_mgr().FPMul)
+    def FPDiv(self, right): return self._apply_infix(_mgr().FPDiv)
+    def FPFMA(self, right): return self._apply_infix(_mgr().FPFMA)
+    def FPSqrt(self, right): return self._apply_infix(_mgr().FPSqrt)
+    def FPRem(self, right): return self._apply_infix(_mgr().FPRem)
+    def FPRoundToIntegral(self, right): 
+        return self._apply_infix(_mgr().FPRoundToIntegral)
+    def FPMin(self, right): return self._apply_infix(_mgr().FPMin)
+    def FPMax(self, right): return self._apply_infix(_mgr().FPMax)
+    def FPLEQ(self, right): return self._apply_infix(_mgr().FPLEQ)
+    def FPLT(self, right):  return self._apply_infix(_mgr().FPLT)
+    def FPGEQ(self, right): return self._apply_infix(_mgr().FPGEQ)
+    def FPGT(self, right):  return self._apply_infix(_mgr().FPGT)
+    def FPEQ(self, right):  return self._apply_infix(_mgr().FPEQ)
+    def FPIsNormal(self, right): return self._apply_infix(_mgr().isNormal)
+    def FPIsSubnormal(self, right): return self._apply_infix(_mgr().isSubnormal)
+    def FPIsZero(self, right): return self._apply_infix(_mgr().isZero)
+    def FPIsInfinite(self, right): return self._apply_infix(_mgr().isInfinite)
+    def FPIsNaN(self, right): return self._apply_infix(_mgr().isNaN)
+    def FPIsNegative(self, right): return self._apply_infix(_mgr().isNegative)
+    def FPIsPositive(self, right): return self._apply_infix(_mgr().isPositive)
 
     #
     # Infix operators

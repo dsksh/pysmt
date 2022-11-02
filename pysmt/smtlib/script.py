@@ -65,6 +65,9 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
                    (outstream is None and printer is None), \
                    "Exactly one of outstream and printer must be set."
 
+        if self.name == smtcmd.SET_LOGIC:
+            outstream.write("(%s %s)" % (self.name, self.args[0]))
+
         if self.name == smtcmd.SET_OPTION:
             outstream.write("(%s %s %s)" % (self.name,self.args[0],self.args[1]))
 

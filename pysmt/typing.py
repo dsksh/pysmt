@@ -506,7 +506,7 @@ class TypeManager(object):
         return self._string
 
     def RM(self):
-        return self.RM
+        return self._rm
 
     def BVType(self, width=32):
         """Returns the singleton associated to the BV type for the given width.
@@ -688,7 +688,7 @@ def ArrayType(index_type, elem_type):
     return mgr.ArrayType(index_type=index_type, elem_type=elem_type)
 
 def FPType(eb, sb):
-    """Returns the BV type for the given width."""
+    """Returns the FP type for the given precision."""
     mgr = pysmt.environment.get_env().type_manager
     return mgr.FPType(eb, sb)
 

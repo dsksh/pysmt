@@ -242,6 +242,13 @@ class SimpleTypeChecker(walkers.DagWalker):
         assert len(args) == 0
         return BVType(formula.bv_width())
 
+    @walkers.handles(op.FP_CONSTANT)
+    def walk_identity_fp(self, formula, args, **kwargs):
+        #pylint: disable=unused-argument
+        assert formula is not None
+        assert len(args) == 3
+        return FPType(formula.fp_eb(), formula.fp_sb())
+
     def walk_symbol(self, formula, args, **kwargs):
         assert formula is not None
         assert len(args) == 0
@@ -342,7 +349,7 @@ class SimpleTypeChecker(walkers.DagWalker):
     def walk_fp_rm_const(self, formula, args, **kwargs):
         return RM
 
-    def walk_fp_to_fp(self, args, ret_ty=None):
+    def walk_fp_to_fp_body(self, args, ret_ty=None):
         target_type = args[0]
         for a in args[1:]:
             if not a == target_type:
@@ -354,7 +361,7 @@ class SimpleTypeChecker(walkers.DagWalker):
 
     @walkers.handles(op.FP_ABS, op.FP_NEG, op.FP_REM, op.FP_MIN, op.FP_MAX)
     def walk_fp_op_wo_rnd(self, formula, args, **kwargs):
-        return self.walk_fp_to_fp(args)
+        return self.walk_fp_to_fp_body(args)
 
     @walkers.handles(op.FP_SQRT, op.FP_ROUND_TO_INTEGRAL, op.FP_ADD, op.FP_SUB,
                      op.FP_MUL, op.FP_DIV, op.FP_FMA)
@@ -362,13 +369,45 @@ class SimpleTypeChecker(walkers.DagWalker):
         if not args[0].is_rm_type():
             return None
 
-        return self.walk_fp_to_fp(args[1:])
+        return self.walk_fp_to_fp_body(args[1:])
 
     @walkers.handles(op.FP_LEQ, op.FP_LT, op.FP_EQ, op.FP_IS_NORMAL,
                      op.FP_IS_SUBNORMAL, op.FP_IS_ZERO, op.FP_IS_INFINITE,
                      op.FP_IS_NAN, op.FP_IS_NEGATIVE, op.FP_IS_POSITIVE)
     def walk_fp_pred(self, formula, args, **kwargs):
-        return self.walk_fp_to_fp(args, BOOL)
+        return self.walk_fp_to_fp_body(args, BOOL)
+
+    @walkers.handles(op.BV_TO_FP)
+    def walk_bv_to_fp(self, formula, args, **kwargs):
+        if not args[0].is_bv_type() or args[0].width != formula.fp_eb() + formula.fp_sb():
+            return None
+
+        return FPType(formula.fp_eb(), formula.fp_sb())
+
+    @walkers.handles(op.FP_TO_FP, op.REAL_TO_FP, op.INT_TO_FP, op.UINT_TO_FP)
+    def walk_fp_to_fp(self, formula, args, **kwargs):
+        if  not args[0].is_rm_type() or \
+            not args[1].is_real_type() and not args[1].is_fp_type() and not args[1].is_bv_type():
+            return None
+
+        # TODO: Check the match between args and ret_ty
+        return FPType(formula.fp_eb(), formula.fp_sb())
+
+    @walkers.handles(op.FP_TO_UBV, op.FP_TO_SBV)
+    def walk_fp_to_bv(self, formula, args, **kwargs):
+        if not args[0].is_rm_type():
+            return None
+        if not args[1].is_fp_type():
+            return None
+
+        # TODO: Check the match between m, eb and sb
+        return BVType(formula.bv_width())
+
+    @walkers.handles(op.FP_TO_REAL)
+    def walk_fp_to_real(self, formula, args, **kwargs):
+        if not args[0].is_fp_type():
+            return None
+        return REAL
 
 # EOC SimpleTypeChecker
 

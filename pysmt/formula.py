@@ -1051,7 +1051,7 @@ class FormulaManager(object):
            Internally, a floating-point constant is faithfully represented by
            three bit strings like the SMT standard.
         '''
-        self.create_node(node_type=op.FP_CONSTANT, args=(sign, eb, i))
+        return self.create_node(node_type=op.FP_CONSTANT, args=(sign, eb, i))
 
     def FPPositiveZero(self, eb, sb):
         '''Create floating-point +zero'''
@@ -1203,6 +1203,44 @@ class FormulaManager(object):
     def FPIsPositive(self, f):
         '''Create fp.isPositive predicate'''
         return self.create_node(node_type=op.FP_IS_POSITIVE, args=(f,))
+
+    def FPToFp(self, eb, sb, rm_or_f, f=None):
+        '''Create fp.to_fp function'''
+        if f == None:
+            return self.create_node(node_type=op.BV_TO_FP, 
+                                    args=(rm_or_f,),
+                                    payload=(eb, sb))
+        elif f.get_type().is_fp_type():
+            return self.create_node(node_type=op.FP_TO_FP, 
+                                    args=(rm_or_f, f),
+                                    payload=(eb, sb))
+        elif f.get_type().is_real_type():
+            return self.create_node(node_type=op.REAL_TO_FP, 
+                                    args=(rm_or_f, f),
+                                    payload=(eb, sb))
+        else:
+            assert f.get_type().is_bv_type()
+            return self.create_node(node_type=op.INT_TO_FP, 
+                                    args=(rm_or_f, f),
+                                    payload=(eb, sb))
+
+    def FPToFpUnsigned(self, eb, sb, rm, f):
+        '''Create fp.to_fp_unsigned function'''
+        return self.create_node(node_type=op.UINT_TO_FP, 
+                                args=(rm, f),
+                                payload=(eb, sb))
+
+    def FPToUbv(self, m, rm, f):
+        '''Create fp.to_ubv function'''
+        return self.create_node(node_type=op.FP_TO_UBV, args=(rm, f), payload=(m,))
+
+    def FPToSbv(self, m, rm, f):
+        '''Create fp.to_sbv function'''
+        return self.create_node(node_type=op.FP_TO_SBV, args=(rm, f), payload=(m,))
+
+    def FPToReal(self, f):
+        '''Create fp.to_real function'''
+        return self.create_node(node_type=op.FP_TO_REAL, args=(f,))
 
     def _Algebraic(self, val):
         """Returns the algebraic number val."""
