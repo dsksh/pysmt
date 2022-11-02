@@ -33,7 +33,7 @@ if sys.version_info >= (3, 3):
 else:
     from collections import Iterable
 
-from six.moves import xrange
+import warnings
 
 import pysmt.typing as types
 import pysmt.operators as op
@@ -97,7 +97,7 @@ class FormulaManager(object):
             return n
 
     def _create_symbol(self, name, typename=types.BOOL):
-        if len(name) == 0:
+        if len(name) == 0 and not self.env.allow_empty_var_names:
             raise PysmtValueError("Empty string is not a valid name")
         if not isinstance(typename, types.PySMTType):
             raise PysmtValueError("typename must be a PySMTType.")
@@ -261,12 +261,16 @@ class FormulaManager(object):
 
     def Div(self, left, right):
         """ Creates an expression of the form: left / right """
-        if right.is_constant(types.REAL):
+        if (right.is_constant(types.REAL, 0) or
+            right.is_constant(types.INT, 0)) \
+           and self.env.enable_div_by_0:
+            # Allow division by 0 byt warn the user
+            # This can only happen in non-linear logics
+            warnings.warn("Warning: Division by 0")
+        elif right.is_constant(types.REAL):
             # If right is a constant we rewrite as left * 1/right
             inverse = Fraction(1) / right.constant_value()
             return self.Times(left, self.Real(inverse))
-        elif right.is_constant(types.INT):
-            raise NotImplementedError
 
         # This is a non-linear expression
         return self.create_node(node_type=op.DIV,
@@ -483,7 +487,7 @@ class FormulaManager(object):
         """ At most one of the bool expressions can be true at anytime.
 
         This using a quadratic encoding:
-           A -> !(B \/ C)
+           A -> !(B \\/ C)
            B -> !(C)
         """
         bool_exprs = self._polymorph_args_to_tuple(args)
@@ -498,8 +502,8 @@ class FormulaManager(object):
         """ Encodes an exactly-one constraint on the boolean symbols.
 
         This using a quadratic encoding:
-           A \/ B \/ C
-           A -> !(B \/ C)
+           A \\/ B \\/ C
+           A -> !(B \\/ C)
            B -> !(C)
         """
         args = self._polymorph_args_to_tuple(args)
@@ -656,17 +660,31 @@ class FormulaManager(object):
                                 args=(formula,),
                                 payload=(formula.bv_width(),))
 
-    def BVAnd(self, left, right):
-        """Returns the Bit-wise AND of two bitvectors of the same size."""
-        return self.create_node(node_type=op.BV_AND,
-                                args=(left,right),
-                                payload=(left.bv_width(),))
+    def BVAnd(self, *args):
+        """Returns the Bit-wise AND of bitvectors of the same size.
+        If more than 2 arguments are passed, a left-associative formula is generated."""
+        args = self._polymorph_args_to_tuple(args)
+        if len(args) == 0:
+            raise PysmtValueError("BVAnd expects at least one argument to be passed")
+        res = args[0]
+        for arg in args[1:]:
+            res = self.create_node(node_type=op.BV_AND,
+                             args=(res,arg),
+                             payload=(res.bv_width(),))
+        return res
 
-    def BVOr(self, left, right):
-        """Returns the Bit-wise OR of two bitvectors of the same size."""
-        return self.create_node(node_type=op.BV_OR,
-                                args=(left,right),
-                                payload=(left.bv_width(),))
+    def BVOr(self,  *args):
+        """Returns the Bit-wise OR of bitvectors of the same size.
+        If more than 2 arguments are passed, a left-associative formula is generated."""
+        args = self._polymorph_args_to_tuple(args)
+        if len(args) == 0:
+            raise PysmtValueError("BVOr expects at least one argument to be passed")
+        res = args[0]
+        for arg in args[1:]:
+            res = self.create_node(node_type=op.BV_OR,
+                             args=(res,arg),
+                             payload=(res.bv_width(),))
+        return res
 
     def BVXor(self, left, right):
         """Returns the Bit-wise XOR of two bitvectors of the same size."""
@@ -726,11 +744,18 @@ class FormulaManager(object):
                                 args=(formula,),
                                 payload=(formula.bv_width(),))
 
-    def BVAdd(self, left, right):
-        """Returns the sum of two BV."""
-        return self.create_node(node_type=op.BV_ADD,
-                                args=(left, right),
-                                payload=(left.bv_width(),))
+    def BVAdd(self, *args):
+        """Returns the sum of BV.
+        If more than 2 arguments are passed, a left-associative formula is generated."""
+        args = self._polymorph_args_to_tuple(args)
+        if len(args) == 0:
+            raise PysmtValueError("BVAdd expects at least one argument to be passed")
+        res = args[0]
+        for arg in args[1:]:
+            res = self.create_node(node_type=op.BV_ADD,
+                             args=(res,arg),
+                             payload=(res.bv_width(),))
+        return res
 
     def BVSub(self, left, right):
         """Returns the difference of two BV."""
@@ -738,11 +763,18 @@ class FormulaManager(object):
                                 args=(left, right),
                                 payload=(left.bv_width(),))
 
-    def BVMul(self, left, right):
-        """Returns the product of two BV."""
-        return self.create_node(node_type=op.BV_MUL,
-                                args=(left, right),
-                                payload=(left.bv_width(),))
+    def BVMul(self, *args):
+        """Returns the product of BV.
+        If more than 2 arguments are passed, a left-associative formula is generated."""
+        args = self._polymorph_args_to_tuple(args)
+        if len(args) == 0:
+            raise PysmtValueError("BVMul expects at least one argument to be passed")
+        res = args[0]
+        for arg in args[1:]:
+            res = self.create_node(node_type=op.BV_MUL,
+                             args=(res,arg),
+                             payload=(res.bv_width(),))
+        return res
 
     def BVUDiv(self, left, right):
         """Returns the division of the two BV."""
@@ -923,7 +955,7 @@ class FormulaManager(object):
     def BVRepeat(self, formula, count=1):
         """Returns the concatenation of count copies of formula."""
         res = formula
-        for _ in xrange(count-1):
+        for _ in range(count-1):
             res = self.BVConcat(res, formula)
         return res
 

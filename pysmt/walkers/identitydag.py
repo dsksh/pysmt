@@ -36,6 +36,9 @@ class IdentityDagWalker(DagWalker):
         return self.mgr.Symbol(formula.symbol_name(),
                                formula.symbol_type())
 
+    def walk_algebraic_constant(self, formula, args, **kwargs):
+        return self.mgr._Algebraic(formula.constant_value())
+
     def walk_real_constant(self, formula, args, **kwargs):
         return self.mgr.Real(formula.constant_value())
 
@@ -239,3 +242,57 @@ class IdentityDagWalker(DagWalker):
 
     def walk_div(self, formula, args, **kwargs):
         return self.mgr.Div(args[0], args[1])
+
+    # For FloatingPoint
+
+    def walk_fp_constant(self, formula, args, **kwargs):
+        return self.mgr.FP(args[0], args[1], args[2])
+    def walk_fp_rne(self, formula, args, **kwargs): return self.mgr.FPRNE()
+    def walk_fp_rna(self, formula, args, **kwargs): return self.mgr.FPRNA()
+    def walk_fp_rtp(self, formula, args, **kwargs): return self.mgr.FPRTP()
+    def walk_fp_rtn(self, formula, args, **kwargs): return self.mgr.FPRTN()
+    def walk_fp_rtz(self, formula, args, **kwargs): return self.mgr.FPRTZ()
+    def walk_fp_abs(self, formula, args, **kwargs): return self.mgr.FPAbs(args[0])
+    def walk_fp_neg(self, formula, args, **kwargs): return self.mgr.FPNeg(args[0])
+    def walk_fp_sqrt(self, formula, args, **kwargs): return self.mgr.FPSqrt(args[0])
+    def walk_fp_round_to_integral(self, formula, args, **kwargs):
+        return self.mgr.FPRoundToIntegral(args[0])
+    def walk_fp_add(self, formula, args, **kwargs): return self.mgr.FPAdd(args[0], args[1])
+    def walk_fp_sub(self, formula, args, **kwargs): return self.mgr.FPSub(args[0], args[1])
+    def walk_fp_mul(self, formula, args, **kwargs): return self.mgr.FPMul(args[0], args[1])
+    def walk_fp_div(self, formula, args, **kwargs): return self.mgr.FPDiv(args[0], args[1])
+    def walk_fp_fma(self, formula, args, **kwargs): return self.mgr.FPFMA(args[0], args[1])
+    def walk_fp_rem(self, formula, args, **kwargs): return self.mgr.FPRem(args[0], args[1])
+    def walk_fp_min(self, formula, args, **kwargs): return self.mgr.FPMin(args[0], args[1])
+    def walk_fp_max(self, formula, args, **kwargs): return self.mgr.FPMax(args[0], args[1])
+    def walk_fp_leq(self, formula, args, **kwargs): return self.mgr.FPLEQ(args[0], args[1])
+    def walk_fp_lt(self, formula, args, **kwargs): return self.mgr.FPLT(args[0], args[1])
+    def walk_fp_eq(self, formula, args, **kwargs): return self.mgr.FPEQ(args[0], args[1])
+    def walk_fp_is_normal(self, formula, args, **kwargs):
+        return self.mgr.FPIsNormal(args[0])
+    def walk_fp_is_subnormal(self, formula, args, **kwargs):
+        return self.mgr.FPIsSubnormal(args[0])
+    def walk_fp_is_zero(self, formula, args, **kwargs):
+        return self.mgr.FPIsZero(args[0])
+    def walk_fp_is_infinite(self, formula, args, **kwargs):
+        return self.mgr.FPIsInfinite(args[0])
+    def walk_fp_is_nan(self, formula, args, **kwargs):
+        return self.mgr.FPIsNaN(args[0])
+    def walk_fp_is_negative(self, formula, args, **kwargs):
+        return self.mgr.FPIsNegative(args[0])
+    def walk_fp_is_positive(self, formula, args, **kwargs):
+        return self.mgr.FPIsPositive(args[0])
+
+    def walk_fp_to_fp_unsigned(self, formula, args, **kwargs):
+        return self.mgr.FPToFpUnsigned(formula.fp_eb(), formula.fp_sb(), args[0], args[1])
+    def walk_fp_to_fp(self, formula, args, **kwargs):
+        return self.mgr.FPToFp(formula.fp_eb(), formula.fp_sb(), args[0], args[1])
+    def walk_bv_to_fp(self, formula, args, **kwargs):
+        return self.mgr.FPToFp(formula.fp_eb(), formula.fp_sb(), args[0])
+
+    def walk_fp_to_ubv(self, formula, args, **kwargs):
+        return self.mgr.FPToUbv(formula.bv_width, args[0], args[1])
+    def walk_fp_to_sbv(self, formula, args, **kwargs):
+        return self.mgr.FPToSbv(formula.bv_width, args[0], args[1])
+    def walk_fp_to_real(self, formula, args, **kwargs): 
+        return self.mgr.FPToReal(args[0])

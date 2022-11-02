@@ -1,6 +1,115 @@
 Change Log
 ==========
 
+0.9.5: 2022-05-28 -- 2 years of bugfixes
+----------------------------------------
+
+Intermediate release that collects 2 years of bugfixes and improvements.
+
+Python 2 was deprecated in version 0.9.0, and this version removes the use of compatible code for that version.
+
+## What's Changed
+
+* Add support for boolean-typed array in the AtomsOracle by @mikand in https://github.com/pysmt/pysmt/pull/644
+* Switched from nosetests to pytest by @mikand in https://github.com/pysmt/pysmt/pull/662
+* Fixed a bug in yices quantifier support and added regression test by @mikand in https://github.com/pysmt/pysmt/pull/657
+* Fix Boolector install script by @4tXJ7f in https://github.com/pysmt/pysmt/pull/656
+* BUG: define UFNIA as logic with integer arithmetic by @johnyf in https://github.com/pysmt/pysmt/pull/659
+* Handling of algebraic constants in simplify by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/658
+* Integer div by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/667
+* Fix CVC4 installation on macOS by @kammoh in https://github.com/pysmt/pysmt/pull/666
+* Bug in times distributor by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/671
+* Fixed reset_assertion method for incremental-tracking solvers by @mikand in https://github.com/pysmt/pysmt/pull/672
+* Minor Corrections by @mfarif in https://github.com/pysmt/pysmt/pull/673
+* implement add_assertions method for solver. by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/679
+* Fix "get_model" when called from a generic solver (Fix #674) by @btwael in https://github.com/pysmt/pysmt/pull/675
+* Remove six and python 2 compatibility code by @marcogario in https://github.com/pysmt/pysmt/pull/684
+* Added fallback to Swig3 to address as much as possible issue #682 by @mikand in https://github.com/pysmt/pysmt/pull/685
+* Fix to correctly pass logic to solvers started by Portfolio by @ekilmer in https://github.com/pysmt/pysmt/pull/683
+* SmtLib model validation support by @mikand in https://github.com/pysmt/pysmt/pull/681
+* Fix iss694 by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/695
+* Fixed CVC4 installer after upstream repository renaming by @mikand in https://github.com/pysmt/pysmt/pull/697
+* Remove call to `FNode.substitute` in SmtLibExecutionCache by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/699
+* Added printing of annotations to smt lib printers by @agirardi-fbk in https://github.com/pysmt/pysmt/pull/703
+* Integer div by @EnricoMagnago in https://github.com/pysmt/pysmt/pull/705
+* Updated docker images to solve deprecation issue on azure pipelines by @mikand in https://github.com/pysmt/pysmt/pull/706
+* Workaround to fix Z3 segfault by @mikand in https://github.com/pysmt/pysmt/pull/713
+* Add possibility to use several BV operators as left associative by @agirardi-fbk in https://github.com/pysmt/pysmt/pull/714
+* Fixed issue #613 by @mikand in https://github.com/pysmt/pysmt/pull/710
+
+## New Contributors
+* @4tXJ7f made their first contribution in https://github.com/pysmt/pysmt/pull/656
+* @johnyf made their first contribution in https://github.com/pysmt/pysmt/pull/659
+* @kammoh made their first contribution in https://github.com/pysmt/pysmt/pull/666
+* @mfarif made their first contribution in https://github.com/pysmt/pysmt/pull/673
+* @btwael made their first contribution in https://github.com/pysmt/pysmt/pull/675
+* @ekilmer made their first contribution in https://github.com/pysmt/pysmt/pull/683
+* @agirardi-fbk made their first contribution in https://github.com/pysmt/pysmt/pull/703
+
+**Full Changelog**: https://github.com/pysmt/pysmt/compare/v0.9.0...v0.9.5
+
+0.9.0: 2020-04-26 -- PySMT as module
+------------------------------------
+
+General:
+
+* PySMT as module (PR #573): It is now possible to do
+    python -m pysmt install
+
+  and
+
+    python -m pysmt shell
+
+  while the tool pystm-install is still available, using the module syntax makes it easier to understand which version of python will be used, in case multiple interpreters co-exist.
+
+* Added functions to obtain the symbols in SMTLIB script (PR #583)
+
+* Python 2 is not supported anymore. While it might still work, we will not actively test for it anymore.
+
+Solvers:
+
+* Boolector: Incremental and Unsat cores support (PR #591, #567). Thanks **Makai Mann** for providing the patch.
+
+* Picosat: Fixed a bug related to solver reset (PR #567)
+
+* Boolector: Upgrade to 3.2.1
+
+* MathSAT: Upgrade to 5.6.1
+
+Bugfix:
+
+* Collections.abc: fix deprecation warning (PR #574, PR #562). Thanks to **Liana Hadarean** and **Caleb Donovick**.
+
+* PysmtSyntaxError: Fix missing message constructor (PR #576). Thanks to **Liana Hadarean** for providing a fix.
+
+* Version: Static version in make_distrib.sh (PR #575)
+
+* Fix simplifier StrIndexOf capitalization (PR #563). Thanks to **Makai Mann** for providing the patch.
+
+* Sort the arguments of Times while simplifying (PR #561). Thanks to **Ahmed Irfan** for providing the patch.
+
+* Fix bug in deque pop in smtlib/parser (PR #558). Thanks to **Sebastiano Mariani** for providing the patch.
+
+* Function names quoted with `'` instead of `|` when seraializing to smt2 (PR #584). Thanks **Kevin Laeufer** for reporting this.
+
+* Fix assertion tracking for boolector (PR #589). Thanks **Makai Mann** for providing the patch.
+
+* Handle one-bit shifts in btor (PR #592) Thanks **Makai Mann** for providing the patch.
+
+* Fix issue with bv conversion in Yices (PR #597). Thanks to `@nano-o` for reporting this.
+
+* Fix Mathsat signature for BV_CONCAT (PR #598). Thanks **Makai Mann** for providing the patch.
+
+* Support n-ary BVConcat (PR #621). Thanks to **Ridwan Shariffdeen** for reporting this.
+
+* Fix a correctness issue when reading from SMT-LIB interface (Issue #616, #615, PR #619). Thanks to **Sergio Mover** for reporting this.
+
+* Clear pending assertions in IncrementalTrackingSolver.assertions (PR #627). Thanks to **Enrico Magnago** for reporting this.
+
+* Various documentation fixes. Thanks to **Matthew Fernandez**, **Guillem Francès**, and **Gianluca Redondi**.
+
+* Disable multiprocessing in run_tests.sh script (PR #637). Thanks **Patrick Trentin** for reporting this.
+
 0.8.0: 2019-01-27 -- Better Install and Great Community
 -------------------------------------------------------
 
@@ -20,7 +129,7 @@ General:
   installs the solvers within the site-package directory (by
   default). This makes it possible to work with virtual environments,
   and does not require anymore to export the Python path, greatly
-  simplifying the installation process. Thanks to **Radomi
+  simplifying the installation process. Thanks to **Radomir
   Stevanovic** for contributing the patch.
 
 * Simplify shared lib usage (PR #494): Modify z3 and msat installers
