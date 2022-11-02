@@ -110,6 +110,7 @@ class SmtLibExecutionCache(object):
         def res(*actual_parameters):
             assert len(formal_parameters) == len(actual_parameters)
             submap = dict(zip(formal_parameters, actual_parameters))
+            #print("sm: ", submap)
             return expression.substitute(submap)
         return res
 
@@ -481,6 +482,32 @@ class SmtLibParser(object):
                             'fp.isNaN':self._operator_adapter(mgr.FPIsNaN),
                             'fp.isNegative':self._operator_adapter(mgr.FPIsNegative),
                             'fp.isPositive':self._operator_adapter(mgr.FPIsPositive),
+                            # RealInterval
+                            'ri.l':self._operator_adapter(mgr.RILower),
+                            'ri.u':self._operator_adapter(mgr.RIUpper),
+                            'is_pinf':self._operator_adapter(mgr.RIIsPinf),
+                            'is_ninf':self._operator_adapter(mgr.RIIsNinf),
+                            'is_nai':self._operator_adapter(mgr.RIIsNaI),
+                            'ri.add':self._operator_adapter(mgr.RIAdd),
+                            'ri.sub':self._operator_adapter(mgr.RISub),
+                            'ri.sub_exact':self._operator_adapter(mgr.RISubE),
+                            'ri.neg':self._operator_adapter(mgr.RINeg),
+                            'ri.mul':self._operator_adapter(mgr.RIMul),
+                            'ri.div':self._operator_adapter(mgr.RIDiv),
+                            'ri.geq':self._operator_adapter(mgr.RIGEQ),
+                            'ri.gt':self._operator_adapter(mgr.RIGT),
+                            'ri.fpeq':self._operator_adapter(mgr.RIFPEQ),
+                            'ri.ite':self._operator_adapter(mgr.RIITE),
+                            'ri.geq-':self._operator_adapter(mgr.RIGEQN),
+                            'ri.gt-':self._operator_adapter(mgr.RIGTN),
+                            'ri.fpeq-':self._operator_adapter(mgr.RIFPEQN),
+                            'ri.fpis':self._operator_adapter(mgr.RIFPIS),
+                            'ri.is':self._operator_adapter(mgr.RIIS),
+                            'ri.eq':self._operator_adapter(mgr.RIEQ),
+                            'ri.neq':self._operator_adapter(mgr.RINEQ),
+                            'ri_to_ri':self._operator_adapter(mgr.RIToRi),
+                            'real_to_ri':self._operator_adapter(mgr.RealToRi),
+                            'ri.exact':self._operator_adapter(mgr.RIExact),
                             }
 
         # Command tokens
@@ -741,6 +768,12 @@ class SmtLibParser(object):
                 res = mgr.FPRTN()
             elif token == "roundTowardZero" or token == "RTZ":
                 res = mgr.FPRTZ()
+            elif token == "ri.zero":
+                res = mgr.RIZero()
+            elif token == "ri.entire":
+                res = mgr.RIEntire()
+            elif token == "ri.nai":
+                res = mgr.RINaI()
             else:
                 # it could be a number or a string
                 try:
@@ -890,11 +923,14 @@ class SmtLibParser(object):
         try:
             while True:
                 tk = tokens.consume_maybe()
+                #print("tk: ", tk)
 
                 if tk == "(":
                     while tk == "(":
                         stack.append([])
                         tk = tokens.consume()
+
+                    #print("tk: ", tk)
 
                     if tk in self.interpreted:
                         fun = self.interpreted[tk]
@@ -911,6 +947,7 @@ class SmtLibParser(object):
                                                tokens.pos_info)
 
                     try:
+                        #print("apply: ", fun)
                         res = fun(*lst)
                     except TypeError as err:
                         if not callable(fun):
@@ -918,8 +955,10 @@ class SmtLibParser(object):
                         raise err
 
                     if len(stack) > 0:
+                        #print("pushing")
                         stack[-1].append(res)
                     else:
+                        #print("returning")
                         return res
 
                 else:
@@ -962,8 +1001,7 @@ class SmtLibParser(object):
             return self.get_script(script)
 
     def parse_atoms(self, tokens, command, min_size, max_size=None):
-        """
-        Parses a sequence of N atoms (min_size <= N <= max_size) consuming
+        """Parses a sequence of N atoms (min_size <= N <= max_size) consuming
         the tokens
         """
         if max_size is None:
@@ -1021,7 +1059,7 @@ class SmtLibParser(object):
             elif op == "_":
                 ts = tokens.consume("Unexpected end of stream in %s command." % \
                                             command)
-                if ts != "BitVec":
+                if ts == "BitVec":
                     size = 0
                     dim = tokens.consume()
                     try:
@@ -1104,6 +1142,8 @@ class SmtLibParser(object):
             res = self.env.type_manager.FPType(11, 53)
         elif var == "Float128":
             res = self.env.type_manager.FPType(15, 113)
+        elif var == "RInt":
+            res = self.env.type_manager.RInt()
         else:
             cached = self.cache.get(var)
             if cached is not None:
@@ -1127,6 +1167,7 @@ class SmtLibParser(object):
             raise PysmtSyntaxError("Unexpected token '%s' in %s command." % \
                                    (var, command),
                                    tokens.pos_info)
+        #print(var)
         return var
 
     def parse_params(self, tokens, command):

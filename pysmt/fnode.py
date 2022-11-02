@@ -58,16 +58,24 @@ from pysmt.operators import (FORALL, EXISTS, AND, OR, NOT, IMPLIES, IFF,
                              FP_IS_ZERO, FP_IS_INFINITE, FP_IS_NAN,
                              FP_IS_NEGATIVE, FP_IS_POSITIVE,
                              BV_TO_FP, FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, 
-                             FP_TO_UBV, FP_TO_SBV, FP_TO_REAL)
+                             FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,
+                             RI_ADD, RI_SUB, RI_SUB_E, RI_NEG, RI_MUL, RI_DIV,
+                             RI_GEQ, RI_GT, RI_FPEQ, RI_ITE, 
+                             RI_GEQ_N, RI_GT_N, RI_FPEQ_N, 
+                             RI_FPIS, RI_IS, RI_EQ, RI_NEQ,
+                             RI_IS_PINF, RI_IS_NINF, RI_IS_NAI,
+                             RI_ZERO, RI_ENTIRE, RI_NAI,
+                             RI_TO_RI, REAL_TO_RI, RI_EXACT)
 
 from pysmt.operators import  (BOOL_OPERATORS, THEORY_OPERATORS,
                               BV_OPERATORS, IRA_OPERATORS, ARRAY_OPERATORS,
                               STR_OPERATORS,
                               FP_OPERATORS,
                               FP_PREDICATES,
+                              RI_OPERATORS,
                               RELATIONS, CONSTANTS)
 
-from pysmt.typing import BOOL, REAL, INT, BVType, STRING, FPType, RM
+from pysmt.typing import BOOL, REAL, INT, BVType, STRING, FPType, RM, RINT
 from pysmt.decorators import deprecated, assert_infix_enabled
 from pysmt.utils import twos_complement
 from pysmt.constants import (Fraction, is_python_integer,
@@ -190,6 +198,10 @@ class FNode(object):
                     self.node_type() != FP_RTP and self.node_type() != FP_RTN and \
                     self.node_type() != FP_RTZ:
                 return False
+            if _type.is_ri_type():
+                # TODO
+                if self.node_type() != RI_ZERO and self.node_type() != RI_ENTIRE and self.node_type() != RI_NAI:
+                    return False
             if _type.is_bv_type():
                 if self.node_type() != BV_CONSTANT:
                     return False
@@ -638,6 +650,19 @@ class FNode(object):
             # TODO
             return self._content.payload[1]
 
+    def ri_is_alias(self):
+        """Check if the value is an alias."""
+        if not self.is_symbol() or self.get_type() != RINT:
+            return False
+        else:
+            return self._content.payload[2]
+
+    def ri_set_alias(self, b):
+        """Set whether a symbol is alias or not."""
+        if self.is_symbol() and self.get_type() == RINT:
+            c = self._content
+            self._content = FNodeContent(c.node_type, c.args, (c.payload[0], c.payload[1], b))
+
     def __str__(self):
         return self.serialize(threshold=5)
 
@@ -1009,6 +1034,10 @@ class FNode(object):
     def FPIsNegative(self, right): return self._apply_infix(_mgr().isNegative)
     def FPIsPositive(self, right): return self._apply_infix(_mgr().isPositive)
 
+    # For RealInterval
+
+    # TODO
+
     #
     # Infix operators
     #
@@ -1123,7 +1152,6 @@ class FNode(object):
                                   "types having function type only")
 
 # EOC FNode
-
 
 def _env():
     """Aux function to obtain the environment."""

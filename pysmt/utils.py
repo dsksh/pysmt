@@ -78,6 +78,13 @@ def quote(name, style='|'):
     else:
         return name
 
+def unquote(qname, style='|'):
+    if qname[0] == style and qname[-1] == style:
+        n = qname[1:-1]
+    else:
+        n = qname
+    return n.replace("\\%s" % style, "%s" % style).replace("\\\\", "\\")
+
 
 def open_(fname):
     """Transparently handle .bz2 files."""

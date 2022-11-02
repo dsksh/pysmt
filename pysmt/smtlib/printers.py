@@ -27,11 +27,12 @@ from pysmt.utils import quote
 
 class SmtPrinter(TreeWalker):
 
-    def __init__(self, stream):
+    def __init__(self, stream, multi_prec=False):
         TreeWalker.__init__(self)
         self.stream = stream
         self.write = self.stream.write
         self.mgr = get_env().formula_manager
+        self.multi_prec = multi_prec
 
     def printer(self, f):
         self.walk(f)
@@ -40,9 +41,15 @@ class SmtPrinter(TreeWalker):
         """This is a complete printer"""
         raise NotImplementedError
 
-    def walk_nary(self, formula, operator):
+    def walk_nary(self, formula, operator, w_prec=False):
         self.write("(%s" % operator)
-        for s in formula.args():
+
+        args = formula.args()
+        if w_prec and self.multi_prec:
+            assert len(args) > 0 and args[0].get_type().is_ri_type()
+            self.write(" %s" % args[0].get_type().precision)
+
+        for s in args:
             self.write(" ")
             yield s
         self.write(")")
@@ -268,10 +275,182 @@ class SmtPrinter(TreeWalker):
             yield assign[k]
             self.write(")")
 
+    # For FloatingPoint
+
+    def walk_fp_constant(self, formula): return self.walk_nary(formula, "fp")
+    def walk_fp_rne(self, formula): self.write("RNE")
+    def walk_fp_rna(self, formula): self.write("RNA")
+    def walk_fp_rtp(self, formula): self.write("RTP")
+    def walk_fp_rtn(self, formula): self.write("RTN")
+    def walk_fp_rtz(self, formula): self.write("RTZ")
+    def walk_fp_abs(self, formula): return self.walk_nary(formula, "fp.abs")
+    def walk_fp_neg(self, formula): return self.walk_nary(formula, "fp.neg")
+    def walk_fp_add(self, formula): return self.walk_nary(formula, "fp.add")
+    def walk_fp_sub(self, formula): return self.walk_nary(formula, "fp.sub")
+    def walk_fp_mul(self, formula): return self.walk_nary(formula, "fp.mul")
+    def walk_fp_div(self, formula): return self.walk_nary(formula, "fp.div")
+    def walk_fp_fma(self, formula): return self.walk_nary(formula, "fp.fma")
+    def walk_fp_sqrt(self, formula): return self.walk_nary(formula, "fp.sqrt")
+    def walk_fp_rem(self, formula): return self.walk_nary(formula, "fp.rem")
+    def walk_fp_round_to_integral(self, formula): return self.walk_nary(formula, "fp.roundToIntegral")
+    def walk_fp_min(self, formula): return self.walk_nary(formula, "fp.min")
+    def walk_fp_max(self, formula): return self.walk_nary(formula, "fp.max")
+    def walk_fp_leq(self, formula): return self.walk_nary(formula, "fp.leq")
+    def walk_fp_lt(self, formula): return self.walk_nary(formula, "fp.lt")
+    def walk_fp_geq(self, formula): return self.walk_nary(formula, "fp.geq")
+    def walk_fp_gt(self, formula): return self.walk_nary(formula, "fp.gt")
+    def walk_fp_eq(self, formula): return self.walk_nary(formula, "fp.eq")
+    def walk_fp_is_normal(self, formula): return self.walk_nary(formula, "fp.isNormal")
+    def walk_fp_is_subnormal(self, formula): return self.walk_nary(formula, "fp.isSubnormal")
+    def walk_fp_is_negative(self, formula): return self.walk_nary(formula, "fp.isNegative")
+    def walk_fp_is_positive(self, formula): return self.walk_nary(formula, "fp.isPositive")
+
+    def walk_fp_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_fp_unsigned(self, formula):
+        self.write("((_ to_fp_unsigned %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_bv_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(")")
+    def walk_real_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+
+    def walk_fp_to_ubv(self, formula):
+        self.write("((_ fp.to_ubv %d) " % (formula.bv_width()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_sbv(self, formula):
+        self.write("((_ fp.to_sbv %d) " % (formula.bv_width()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_real(self, formula): return self.walk_nary(formula, "fp.to_real")
+
+    # RealInterval
+
+    def walk_ri_l(self, formula): return self.walk_nary(formula, "ri.l")
+    def walk_ri_u(self, formula): return self.walk_nary(formula, "ri.u")
+    def walk_ri_is_pinf(self, formula): return self.walk_nary(formula, "is_pinf", w_prec=True)
+    def walk_ri_is_ninf(self, formula): return self.walk_nary(formula, "is_ninf", w_prec=True)
+    def walk_ri_is_nai(self, formula): return self.walk_nary(formula, "p_nan")
+    def walk_ri_abs(self, formula): return self.walk_nary(formula, "ri.abs", w_prec=True)
+    def walk_ri_add(self, formula): return self.walk_nary(formula, "ri.add", w_prec=True)
+    def walk_ri_sub(self, formula): return self.walk_nary(formula, "ri.sub", w_prec=True)
+    def walk_ri_sub_e(self, formula): return self.walk_nary(formula, "ri.sub_exact", w_prec=True)
+    def walk_ri_neg(self, formula): return self.walk_nary(formula, "ri.neg", w_prec=True)
+    def walk_ri_mul(self, formula): return self.walk_nary(formula, "ri.mul", w_prec=True)
+    def walk_ri_div(self, formula): return self.walk_nary(formula, "ri.div", w_prec=True)
+    def walk_ri_geq(self, formula): return self.walk_nary(formula, "ri.geq", w_prec=True)
+    def walk_ri_gt(self, formula): return self.walk_nary(formula, "ri.gt", w_prec=True)
+    #def walk_ri_eq(self, formula): 
+    #    #return self.walk_nary(formula, "ri.eq+", w_prec=True)
+    #    if ( (formula.args()[0].is_symbol() and not formula.args()[1].is_symbol()) or
+    #            (not formula.args()[0].is_symbol() and formula.args()[1].is_symbol()) ):
+    #        return self.walk_nary(formula, "=")
+    #    else:            
+    #        return self.walk_nary(formula, "ri.fpeq", w_prec=True)
+    def walk_ri_fpeq(self, formula): return self.walk_nary(formula, "ri.fpeq", w_prec=True)
+    def walk_ri_ite(self, formula): return self.walk_nary(formula, "ri.ite", w_prec=True)
+    def walk_ri_geq_n(self, formula): return self.walk_nary(formula, "ri.lt", w_prec=True)
+    def walk_ri_gt_n(self, formula): return self.walk_nary(formula, "ri.leq", w_prec=True)
+    def walk_ri_fpeq_n(self, formula): return self.walk_nary(formula, "ri.fpneq", w_prec=True)
+    def walk_ri_fpis(self, formula): return self.walk_nary(formula, "ri.fpis", w_prec=True)
+    def walk_ri_is(self, formula): return self.walk_nary(formula, "ri.is", w_prec=True)
+    def walk_ri_eq(self, formula): return self.walk_nary(formula, "ri.eq", w_prec=True)
+    def walk_ri_neq(self, formula): return self.walk_nary(formula, "ri.neq", w_prec=True)
+
+    def walk_ri_to_ri(self, formula): 
+        if not self.multi_prec:
+            self.write("(ri_to_ri ")
+            yield formula.arg(1)
+            self.write(")")
+        else:
+            self.write("(ri_to_ri ")
+            yield formula.arg(0)
+            self.write(" ")
+            yield formula.arg(1)
+            self.write(")")
+    def walk_real_to_ri(self, formula): 
+        if not self.multi_prec:
+            self.write("(real_to_ri ")
+            yield formula.arg(1)
+            self.write(")")
+        else:
+            self.write("(real_to_ri ")
+            yield formula.arg(0)
+            self.write(" ")
+            yield formula.arg(1)
+            self.write(")")
+    def walk_ri_exact(self, formula): 
+        if not self.multi_prec:
+            assert len(formula.args()) >= 1
+            #self.write("(ri.exact %s)" % args[1])
+            self.write("(ri.exact ")
+            yield formula.arg(1)
+            self.write(")")
+        else:
+            assert len(formula.args()) >= 2
+            #self.write("(ri.exact %s %s)" % (args[0], args[1]))
+            self.write("(ri.exact ")
+            yield formula.arg(0)
+            self.write(" ")
+            yield formula.arg(1)
+            self.write(")")
+
+    def walk_ri_zero(self, formula): self.write("ri.zero")
+    def walk_ri_pinf(self, formula): 
+        if not self.multi_prec:
+            self.write("ri.pinf")
+        else:
+            #self.write("(ri.pinf %s)" % formula.args()[0])
+            self.write("(ri.pinf ")
+            yield formula.arg(0)
+            self.write(")")
+    def walk_ri_ninf(self, formula): 
+        if not self.multi_prec:
+            self.write("ri.ninf")
+        else:
+            #self.write("(ri.ninf %s)" % formula.args()[0])
+            self.write("(ri.ninf ")
+            yield formula.arg(0)
+            self.write(")")
+    def walk_ri_entire(self, formula): 
+        if not self.multi_prec:
+            self.write("ri.entire")
+        else:
+            #self.write("(ri.entire %s)" % formula.args()[0])
+            self.write("(ri.entire ")
+            yield formula.arg(0)
+            self.write(")")
+    def walk_ri_nai(self, formula): 
+        #self.write("ri.zero_nan")
+        self.write("ri.ninf_nan")
+
+    #def walk_ri_zero(self, formula): self.write("ri.zero")
+    #def walk_ri_entire(self, formula): self.write("ri.entire")
+    #def walk_ri_nai(self, formula): return self.write("ri.nai")
+    #def walk_ri_to_ri(self, formula): return self.walk_nary(formula, "ri.to_ri", w_prec=True)
+    #def walk_ri_exact(self, formula): return self.walk_nary(formula, "ri.exact")
 
 class SmtDagPrinter(DagWalker):
 
-    def __init__(self, stream, template=".def_%d"):
+    def __init__(self, stream, template=".def_%d", multi_prec=True):
         DagWalker.__init__(self, invalidate_memoization=True)
         self.stream = stream
         self.write = self.stream.write
@@ -280,6 +459,7 @@ class SmtDagPrinter(DagWalker):
         self.template = template
         self.names = None
         self.mgr = get_env().formula_manager
+        self.multi_prec = multi_prec
 
     def _push_with_children_to_stack(self, formula, **kwargs):
         """Add children to the stack."""
@@ -313,11 +493,18 @@ class SmtDagPrinter(DagWalker):
         self.name_seed += 1
         return res
 
-    def walk_nary(self, formula, args, operator):
+    def walk_nary(self, formula, args, operator, w_prec=False):
         assert formula is not None
+
         sym = self._new_symbol()
         self.openings += 1
         self.write("(let ((%s (%s" % (sym, operator))
+
+        args_ = formula.args()
+        if w_prec and self.multi_prec:
+            assert len(args_) > 0 and args_[0].get_type().is_ri_type()
+            self.write(" %s" % args_[0].get_type().precision)
+
         for s in args:
             self.write(" ")
             self.write(s)
@@ -348,9 +535,7 @@ class SmtDagPrinter(DagWalker):
     def walk_times(self, formula, args):
         return self.walk_nary(formula, args, "*")
 
-    def walk_equals(self, formula, args):
-        return self.walk_nary(formula, args, "=")
-
+    def walk_equals(self, formula, args): return self.walk_nary(formula, args, "=")
     def walk_le(self, formula, args):
         return self.walk_nary(formula, args, "<=")
 
@@ -623,6 +808,132 @@ class SmtDagPrinter(DagWalker):
         self.write("))")
         return sym
 
+    # For FloatingPoint
+
+    def walk_fp_constant(self, formula, args): return self.walk_nary(formula, args, "fp")
+    def walk_fp_rne(self, formula, args): return "RNE"
+    def walk_fp_rna(self, formula, args): return "RNA"
+    def walk_fp_rtp(self, formula, args): return "RTP"
+    def walk_fp_rtn(self, formula, args): return "RTN"
+    def walk_fp_rtz(self, formula, args): return "RTZ"
+    def walk_fp_abs(self, formula, args): return self.walk_nary(formula, args, "fp.abs")
+    def walk_fp_neg(self, formula, args): return self.walk_nary(formula, args, "fp.neg")
+    def walk_fp_add(self, formula, args): return self.walk_nary(formula, args, "fp.add")
+    def walk_fp_sub(self, formula, args): return self.walk_nary(formula, args, "fp.sub")
+    def walk_fp_mul(self, formula, args): return self.walk_nary(formula, args, "fp.mul")
+    def walk_fp_div(self, formula, args): return self.walk_nary(formula, args, "fp.div")
+    def walk_fp_fma(self, formula, args): return self.walk_nary(formula, args, "fp.fma")
+    def walk_fp_sqrt(self, formula, args): return self.walk_nary(formula, args, "fp.sqrt")
+    def walk_fp_rem(self, formula, args): return self.walk_nary(formula, args, "fp.rem")
+    def walk_fp_round_to_integral(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.roundToIntegral")
+    def walk_fp_min(self, formula, args): return self.walk_nary(formula, args, "fp.min")
+    def walk_fp_max(self, formula, args): return self.walk_nary(formula, args, "fp.max")
+    def walk_fp_leq(self, formula, args): return self.walk_nary(formula, args, "fp.leq")
+    def walk_fp_lt(self, formula, args): return self.walk_nary(formula, args, "fp.lt")
+    def walk_fp_geq(self, formula, args): return self.walk_nary(formula, args, "fp.geq")
+    def walk_fp_gt(self, formula, args): return self.walk_nary(formula, args, "fp.gt")
+    def walk_fp_eq(self, formula, args): return self.walk_nary(formula, args, "fp.eq")
+    def walk_fp_is_normal(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isNormal")
+    def walk_fp_is_subnormal(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isSubnormal")
+    def walk_fp_is_zero(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isZero")
+    def walk_fp_is_infinite(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isInfinite")
+    def walk_fp_is_nan(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isNaN")
+    def walk_fp_is_negative(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isNegative")
+    def walk_fp_is_positive(self, formula, args): 
+        return self.walk_nary(formula, args, "fp.isPositive")
+
+    def walk_fp_to_fp(self, formula, args):
+        return "((_ to_fp %d %d) %s %s)" % (formula.fp_eb(), formula.fp_sb(), args[0], args[1])
+    def walk_fp_to_fp_unsigned(self, formula, args):
+        return "((_ to_fp_unsigned %d %d) %s %s)" % (formula.fp_eb(), formula.fp_sb(), args[0], args[1])
+    def walk_bv_to_fp(self, formula, args):
+        return "((_ to_fp %d %d) %s)" % (formula.fp_eb(), formula.fp_sb(), args[0])
+    def walk_real_to_fp(self, formula, args):
+        return "((_ to_fp %d %d) %s %s)" % (formula.fp_eb(), formula.fp_sb(), args[0], args[1])
+
+    def walk_fp_to_ubv(self, formula, args):
+        return "((_ fp.to_ubv %d) %s %s)" % (formula.bv_width(), args[0], args[1])
+    def walk_fp_to_sbv(self, formula, args):
+        return "((_ fp.to_sbv %d) %s %s)" % (formula.bv_width(), args[0], args[1])
+    def walk_fp_to_real(self, formula, args): return self.walk_nary(formula, args, "fp.to_real")
+
+    # For RealInterval
+
+    def walk_ri_l(self, formula, args): return self.walk_nary(formula, args, "ri.l")
+    def walk_ri_u(self, formula, args): return self.walk_nary(formula, args, "ri.u")
+    def walk_ri_is_pinf(self, formula, args): return self.walk_nary(formula, args, "is_pinf", w_prec=True)
+    def walk_ri_is_ninf(self, formula, args): return self.walk_nary(formula, args, "is_ninf", w_prec=True)
+    def walk_ri_is_nai(self, formula, args): return self.walk_nary(formula, args, "p_nan")
+    def walk_ri_abs(self, formula, args): return self.walk_nary(formula, args, "ri.abs", w_prec=False)
+    def walk_ri_add(self, formula, args): return self.walk_nary(formula, args, "ri.add", w_prec=True)
+    def walk_ri_sub(self, formula, args): return self.walk_nary(formula, args, "ri.sub", w_prec=True)
+    def walk_ri_sub_e(self, formula, args): return self.walk_nary(formula, args, "ri.sub_exact", w_prec=True)
+    def walk_ri_neg(self, formula, args): return self.walk_nary(formula, args, "ri.neg", w_prec=True)
+    def walk_ri_mul(self, formula, args): return self.walk_nary(formula, args, "ri.mul", w_prec=True)
+    def walk_ri_div(self, formula, args): return self.walk_nary(formula, args, "ri.div", w_prec=True)
+    def walk_ri_geq(self, formula, args): return self.walk_nary(formula, args, "ri.geq", w_prec=True)
+    def walk_ri_gt(self, formula, args): return self.walk_nary(formula, args, "ri.gt", w_prec=True)
+    #def walk_ri_fpeq(self, formula, args): 
+    #    #return self.walk_nary(formula, args, "ri.eq+", w_prec=True)
+    #    if ( (formula.args()[0].is_symbol() and not formula.args()[1].is_symbol()) or
+    #            (not formula.args()[0].is_symbol() and formula.args()[1].is_symbol()) ):
+    #        return self.walk_nary(formula, args, "=")
+    #    else:            
+    #        return self.walk_nary(formula, args, "ri.fpeq", w_prec=True)
+    def walk_ri_fpeq(self, formula, args): return self.walk_nary(formula, args, "ri.fpeq", w_prec=True)
+    def walk_ri_ite(self, formula, args): return self.walk_nary(formula, args, "ri.ite", w_prec=True)
+    def walk_ri_geq_n(self, formula, args): return self.walk_nary(formula, args, "ri.lt", w_prec=True)
+    def walk_ri_gt_n(self, formula, args): return self.walk_nary(formula, args, "ri.leq", w_prec=True)
+    def walk_ri_fpeq_n(self, formula, args): return self.walk_nary(formula, args, "ri.fpneq", w_prec=True)
+    def walk_ri_fpis(self, formula, args): return self.walk_nary(formula, args, "ri.fpis", w_prec=True)
+    def walk_ri_is(self, formula, args): return self.walk_nary(formula, args, "ri.is", w_prec=True)
+    def walk_ri_eq(self, formula, args): return self.walk_nary(formula, args, "ri.eq", w_prec=True)
+    def walk_ri_neq(self, formula, args): return self.walk_nary(formula, args, "ri.neq", w_prec=True)
+
+    def walk_ri_to_ri(self, formula, args): 
+        if not self.multi_prec:
+            return "(ri_to_ri %s)" % args[1]
+        else:
+            return "(ri_to_ri %s %s)" % (args[0], args[1])
+    def walk_real_to_ri(self, formula, args): 
+        if not self.multi_prec:
+            return "(real_to_ri %s)" % args[1]
+        else:
+            return "(real_to_ri %s %s)" % (args[0], args[1])
+    def walk_ri_exact(self, formula, args): 
+        if not self.multi_prec:
+            assert len(args) >= 1
+            return "(ri.exact %s)" % args[1]
+        else:
+            assert len(args) >= 2
+            return "(ri.exact %s %s)" % (args[0], args[1])
+
+    def walk_ri_zero(self, formula, args): return "ri.zero"
+    def walk_ri_pinf(self, formula, args): 
+        if not self.multi_prec:
+            return "ri.pinf"
+        else:
+            return "(ri.pinf %s)" % args[0]
+    def walk_ri_ninf(self, formula, args): 
+        if not self.multi_prec:
+            return "ri.ninf"
+        else:
+            return "(ri.ninf %s)" % args[0]
+    def walk_ri_entire(self, formula, args): 
+        if not self.multi_prec:
+            return "ri.entire"
+        else:
+            return "(ri.entire %s)" % args[0]
+    def walk_ri_nai(self, formula, args): 
+        #return "ri.zero_nan"
+        return "ri.ninf_nan"
 
 def to_smtlib(formula, daggify=True):
     """Returns a Smt-Lib string representation of the formula.

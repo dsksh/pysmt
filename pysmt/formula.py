@@ -90,6 +90,7 @@ class FormulaManager(object):
         if content in self.formulae:
             return self.formulae[content]
         else:
+            #print("CN: %d %d" % (node_type, self._next_free_id))
             n = FNode(content, self._next_free_id)
             self._next_free_id += 1
             self.formulae[content] = n
@@ -103,7 +104,7 @@ class FormulaManager(object):
             raise PysmtValueError("typename must be a PySMTType.")
         n = self.create_node(node_type=op.SYMBOL,
                              args=tuple(),
-                             payload=(name, typename))
+                             payload=(name, typename, False))
         self.symbols[name] = n
         return n
 
@@ -277,6 +278,8 @@ class FormulaManager(object):
 
         For the boolean case use Iff
         """
+        #print("l: ", left)
+        #print("r: ", right)
         return self.create_node(node_type=op.EQUALS,
                                 args=(left, right))
 
@@ -1046,6 +1049,8 @@ class FormulaManager(object):
         return self.create_node(node_type=op.ARRAY_VALUE, args=tuple(args),
                                 payload=idx_type)
 
+    # For FloatingPoint.
+
     def FP(self, sign, eb, i):
         '''Create a node representing a floating-point constant.
            Internally, a floating-point constant is faithfully represented by
@@ -1241,6 +1246,134 @@ class FormulaManager(object):
     def FPToReal(self, f):
         '''Create fp.to_real function'''
         return self.create_node(node_type=op.FP_TO_REAL, args=(f,))
+
+    #
+
+    def RILower(self, f):
+        '''Create ri.l term'''
+        return self.create_node(node_type=op.RI_L, args=(f,))
+
+    def RIUpper(self, f):
+        '''Create ri.u term'''
+        return self.create_node(node_type=op.RI_U, args=(f,))
+
+    def RIIsPinf(self, f):
+        '''Create ri.is_pinf relation'''
+        return self.create_node(node_type=op.RI_IS_PINF, args=(f,))
+
+    def RIIsNinf(self, f):
+        '''Create ri.is_ninf relation'''
+        return self.create_node(node_type=op.RI_IS_NINF, args=(f,))
+
+    def RIIsNaI(self, f):
+        '''Create ri.is_nan relation'''
+        return self.create_node(node_type=op.RI_IS_NAI, args=(f,))
+
+    def RIAbs(self, f):
+        '''Create ri.add relation'''
+        return self.create_node(node_type=op.RI_ABS, args=(f,))
+
+    def RIAdd(self, f1, f2):
+        '''Create ri.add relation'''
+        return self.create_node(node_type=op.RI_ADD, args=(f1, f2))
+
+    def RISub(self, f1, f2):
+        '''Create ri.sub relation'''
+        return self.create_node(node_type=op.RI_SUB, args=(f1, f2))
+
+    def RISubE(self, f1, f2):
+        '''Create ri.sub_exact relation'''
+        return self.create_node(node_type=op.RI_SUB_E, args=(f1, f2))
+
+    def RINeg(self, f):
+        '''Create ri.neg relation'''
+        return self.create_node(node_type=op.RI_NEG, args=(f,))
+
+    def RIMul(self, f1, f2):
+        '''Create ri.mul relation'''
+        return self.create_node(node_type=op.RI_MUL, args=(f1, f2))
+
+    def RIDiv(self, f1, f2):
+        '''Create ri.div relation'''
+        return self.create_node(node_type=op.RI_DIV, args=(f1, f2))
+
+    def RIGEQ(self, f1, f2):
+        '''Create ri.geq relation'''
+        return self.create_node(node_type=op.RI_GEQ, args=(f1, f2))
+
+    def RIGT(self, f1, f2):
+        '''Create ri.gt relation'''
+        return self.create_node(node_type=op.RI_GT, args=(f1, f2))
+
+    def RIFPEQ(self, f1, f2):
+        '''Create ri.fpeq relation'''
+        return self.create_node(node_type=op.RI_FPEQ, args=(f1, f2))
+
+    def RIITE(self, f1, f2, f3):
+        '''Create ri.ite relation'''
+        return self.create_node(node_type=op.RI_ITE, args=(f1, f2, f3))
+
+    def RIGEQN(self, f1, f2):
+        '''Create ri.lt relation'''
+        return self.create_node(node_type=op.RI_GEQ_N, args=(f1, f2))
+
+    def RIGTN(self, f1, f2):
+        '''Create ri.leq relation'''
+        return self.create_node(node_type=op.RI_GT_N, args=(f1, f2))
+
+    def RIFPEQN(self, f1, f2):
+        '''Create ri.fpneq relation'''
+        return self.create_node(node_type=op.RI_FPEQ_N, args=(f1, f2))
+
+    def RIFPIS(self, f1, f2):
+        '''Create ri.fpis operation'''
+        return self.create_node(node_type=op.RI_FPIS, args=(f1, f2))
+
+    def RIIS(self, f1, f2):
+        '''Create ri.is operation'''
+        return self.create_node(node_type=op.RI_IS, args=(f1, f2))
+
+    def RIEQ(self, f1, f2):
+        '''Create ri.eq operation'''
+        return self.create_node(node_type=op.RI_EQ, args=(f1, f2))
+
+    def RINEQ(self, f1, f2):
+        '''Create ri.neq operation'''
+        return self.create_node(node_type=op.RI_NEQ, args=(f1, f2))
+
+    def RIZero(self, p):
+        '''Create the point interval [+/-0]'''
+        return self.create_node(node_type=op.RI_ZERO, args=(p,))
+
+    def RIPInf(self, p):
+        '''Create the entire interval [max_val, +inf]'''
+        return self.create_node(node_type=op.RI_PINF, args=(p,))
+
+    def RINInf(self, p):
+        '''Create the entire interval [-inf, -max_val]'''
+        return self.create_node(node_type=op.RI_NINF, args=(p,))
+
+    def RIEntire(self, p):
+        '''Create the entire interval [-inf, +inf]'''
+        return self.create_node(node_type=op.RI_ENTIRE, args=(p,))
+
+    def RINaI(self, p):
+        '''Create the NaI constant'''
+        return self.create_node(node_type=op.RI_NAI, args=(p,))
+
+    def RIToRi(self, p, f=None):
+        '''Create ri.ri_to_ri function'''
+        return self.create_node(node_type=op.RI_TO_RI, args=(p,f))
+
+    def RealToRi(self, p, f=None):
+        '''Create ri.to_ri function'''
+        return self.create_node(node_type=op.REAL_TO_RI, args=(p,f))
+
+    def RIExact(self, p, f=None):
+        '''Create ri.exact function'''
+        return self.create_node(node_type=op.RI_EXACT, args=(p, f))
+
+    #
 
     def _Algebraic(self, val):
         """Returns the algebraic number val."""

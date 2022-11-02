@@ -557,6 +557,14 @@ function symbols.""",
                  real_arithmetic=True,
                  uninterpreted=True)
 
+QF_LIRA = Logic(name="QF_LIRA",
+                description=\
+"""Unquantified linear mixed integer and real arithmetic.""",
+                quantifier_free=True,
+                integer_arithmetic=True,
+                real_arithmetic=True,
+                uninterpreted=False)
+
 
 QF_UFNRA = Logic(name="QF_UFNRA",
                  description=\
@@ -622,6 +630,20 @@ QF_FP = Logic(name="QF_FP",
               quantifier_free=True,
               floating_point=True)
 
+QF_BVFP = Logic(name="QF_BVFP",
+              description=\
+              '''Closed quantifier-free formulas over the theory of Bitvectors and floating-point.''',
+              quantifier_free=True,
+              bit_vectors=True,
+              floating_point=True)
+
+QF_LRIA = Logic(name="QF_LRIA",
+              description=\
+              '''Closed quantifier-free formulas over the theory of real intervals.''',
+              linear=True,
+              quantifier_free=True,
+              real_arithmetic=True)
+
 
 AUTO = Logic(name="Auto",
              description="Special logic used to indicate that the logic to be used depends on the formula.")
@@ -659,6 +681,8 @@ SMTLIB2_LOGICS = frozenset([ AUFLIA,
                              QF_UFLIRA,
                              QF_SLIA,
                              QF_FP,
+                             QF_BVFP,
+                             QF_LRIA,
                          ])
 
 LOGICS = SMTLIB2_LOGICS | frozenset([ QF_BOOL, BOOL, QF_AUFBVLIRA])

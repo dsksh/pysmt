@@ -288,7 +288,8 @@ class NNFizer(DagWalker):
                 formula.is_symbol() or \
                 formula.is_function_application() or \
                 formula.is_bool_constant() or \
-                formula.is_theory_relation(), str(formula)
+                formula.is_theory_relation() or \
+                formula.is_fp_pred(), str(formula) # TODO
             return []
 
     def walk_not(self, formula, args, **kwargs):

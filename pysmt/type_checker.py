@@ -25,7 +25,7 @@ reasoning about the type of formulae.
 import pysmt.walkers as walkers
 import pysmt.operators as op
 
-from pysmt.typing import BOOL, REAL, INT, BVType, ArrayType, STRING, FPType, RM
+from pysmt.typing import BOOL, REAL, INT, BVType, ArrayType, STRING, FPType, RM, RIntType
 from pysmt.exceptions import PysmtTypeError
 
 
@@ -339,9 +339,9 @@ class SimpleTypeChecker(walkers.DagWalker):
     def walk_fp_constant(self, formula, args, **kwargs):
         sign = args[0]
         eb = args[1]
-        i = args[2]
-        if sign.is_bv_type(1) and eb.is_bv_type() and i.is_bv_type():
-            return FPType(eb.width, i.width + 1)
+        sb = args[2]
+        if sign.is_bv_type(1) and eb.is_bv_type() and sb.is_bv_type():
+            return FPType(eb.width, sb.width + 1)
         else:
             return None
 
@@ -363,7 +363,8 @@ class SimpleTypeChecker(walkers.DagWalker):
     def walk_fp_op_wo_rnd(self, formula, args, **kwargs):
         return self.walk_fp_to_fp_body(args)
 
-    @walkers.handles(op.FP_SQRT, op.FP_ROUND_TO_INTEGRAL, op.FP_ADD, op.FP_SUB,
+    @walkers.handles(op.FP_SQRT, op.FP_ROUND_TO_INTEGRAL, \
+                     op.FP_ADD, op.FP_SUB, \
                      op.FP_MUL, op.FP_DIV, op.FP_FMA)
     def walk_fp_op_w_rnd(self, formula, args, **kwargs):
         if not args[0].is_rm_type():
@@ -371,11 +372,11 @@ class SimpleTypeChecker(walkers.DagWalker):
 
         return self.walk_fp_to_fp_body(args[1:])
 
-    @walkers.handles(op.FP_LEQ, op.FP_LT, op.FP_EQ, op.FP_IS_NORMAL,
-                     op.FP_IS_SUBNORMAL, op.FP_IS_ZERO, op.FP_IS_INFINITE,
+    @walkers.handles(op.FP_LEQ, op.FP_LT, op.FP_EQ, op.FP_IS_NORMAL, \
+                     op.FP_IS_SUBNORMAL, op.FP_IS_ZERO, op.FP_IS_INFINITE, \
                      op.FP_IS_NAN, op.FP_IS_NEGATIVE, op.FP_IS_POSITIVE)
     def walk_fp_pred(self, formula, args, **kwargs):
-        return self.walk_fp_to_fp_body(args, BOOL)
+        return self.walk_fp_to_fp_body(args, ret_ty=BOOL)
 
     @walkers.handles(op.BV_TO_FP)
     def walk_bv_to_fp(self, formula, args, **kwargs):
@@ -406,6 +407,89 @@ class SimpleTypeChecker(walkers.DagWalker):
     @walkers.handles(op.FP_TO_REAL)
     def walk_fp_to_real(self, formula, args, **kwargs):
         if not args[0].is_fp_type():
+            return None
+        return REAL
+
+    # RealInterval
+
+    def walk_rint_to_rint(self, args, ret_ty=None):
+        target_type = args[0]
+        for a in args[1:]:
+            if not a == target_type:
+                return None
+            elif target_type.precision < 0:
+                target_type.set_precision(a.precision)
+            elif a.precision < 0:
+                a.set_precision(target_type.precision)
+        return target_type if ret_ty is None else ret_ty
+
+    #def walk_p_rint_to_rint(self, args, ret_ty=None):
+    #    if not args[0].is_int_type():
+    #        return None
+    #    #if not args[1].is_ri_type():
+    #    #    return None
+    #    for a in args[1:]:
+    #        if not a.is_ri_type():
+    #            return None
+    #    return RINT if ret_ty is None else ret_ty
+
+    @walkers.handles(op.RI_ABS, op.RI_ADD, op.RI_SUB, op.RI_SUB_E, op.RI_NEG, \
+                     op.RI_MUL, op.RI_DIV)
+    def walk_ri_op(self, formula, args, **kwargs):
+        return self.walk_rint_to_rint(args)
+
+    @walkers.handles(op.RI_IS_NAI, \
+                     op.RI_GEQ, op.RI_GT, op.RI_FPEQ, \
+                     op.RI_GEQ_N, op.RI_GT_N, op.RI_FPEQ_N, \
+                     op.RI_FPIS, op.RI_IS, op.RI_EQ, op.RI_NEQ, \
+                     op.RI_IS_PINF, op.RI_IS_NINF)
+    def walk_ri_pred(self, formula, args, **kwargs):
+        return self.walk_rint_to_rint(args, ret_ty=BOOL)
+
+    @walkers.handles(op.RI_ITE)
+    def walk_ri_ite(self, formula, args, **kwargs):
+        if not args[0].is_bool_type():
+            return None
+        elif not args[1].is_ri_type():
+            return None
+        elif not args[2].is_ri_type():
+            return None
+        elif args[1].precision() != args[2].precision():
+            return None
+        return RIntType(args[1].precision)
+
+    @walkers.handles(op.RI_PINF, op.RI_NINF, op.RI_ENTIRE, op.RI_ZERO, op.RI_NAI)
+    def walk_ri_const_mp(self, formula, args, **kwargs):
+        if  not args[0].is_int_type():
+            return None
+        else:
+            return RIntType(formula.args()[0].constant_value())
+
+    @walkers.handles(op.RI_TO_RI)
+    def walk_ri_to_ri_from_ri(self, formula, args, **kwargs):
+        if  not args[0].is_int_type():
+            return None
+        elif  not args[0].is_int_type() and not args[0].is_ri_type():
+            return None
+        return RIntType(formula.args()[0].constant_value())
+
+    @walkers.handles(op.REAL_TO_RI)
+    def walk_ri_to_ri(self, formula, args, **kwargs):
+        if  not args[0].is_int_type():
+            return None
+        elif  not args[0].is_int_type() and not args[0].is_real_type():
+            return None
+        return RIntType(formula.args()[0].constant_value())
+
+    @walkers.handles(op.RI_EXACT)
+    def walk_ri_exact(self, formula, args, **kwargs):
+        if  not args[0].is_int_type() and not args[0].is_real_type():
+            return None
+        return RIntType(formula.args()[0].constant_value())
+
+    @walkers.handles(op.RI_L, op.RI_U)
+    def walk_ri_lu(self, formula, args, **kwargs):
+        if  not args[0].is_ri_type():
             return None
         return REAL
 

@@ -26,6 +26,7 @@ In the current version these are:
  * ArrayType
  * FPType
  * RMType
+ * RIntType
 
 Types are represented by singletons. Basic types (Bool, Int and Real)
 are constructed here by default, while BVType and FunctionType relies
@@ -102,6 +103,9 @@ class PySMTType(object):
         return False
 
     def is_rm_type(self):
+        return False
+
+    def is_ri_type(self, p=None):
         return False
 
     def __hash__(self):
@@ -429,6 +433,50 @@ class _RMType(PySMTType):
 # EOC _RMType
 
 
+class _RIntType(PySMTType):
+    """Internal class to represent a Floating-Point type.
+
+    This class should not be instantiated directly, but the factory
+    method FPType should be used instead.
+    """
+
+    _instances = {}
+
+    def __init__(self, p=-1):
+        decl = _TypeDecl("RInt_{0}".format(p), 0)
+        PySMTType.__init__(self, decl=decl, args=None)
+        self._p = p
+
+    @property
+    def precision(self):
+        return self._p
+
+    def set_precision(self, p):
+        self._p = p
+
+    def is_ri_type(self, p=None):
+        if p and self._p >= 0 and p >= 0:
+            return self._p == p
+        else:
+            return True
+
+    def as_smtlib(self, funstyle=True):
+        type_decl = "RInt"
+        if funstyle:
+            return "() {0}".format(type_decl)
+        else:
+            return type_decl
+
+    def __eq__(self, other):
+        return other is not None \
+            and other.is_ri_type(self.precision)
+
+    def __hash__(self):
+        return hash(self.precision)
+
+# EOC _RIntType
+
+
 class PartialType(object):
     """PartialType allows to delay the definition of a Type.
 
@@ -451,8 +499,9 @@ class PartialType(object):
 BOOL = _BoolType()
 REAL = _RealType()
 INT =  _IntType()
-RM = _RMType()
 STRING = _StringType()
+RM = _RMType()
+RINT = _RIntType()
 PYSMT_TYPES = frozenset([BOOL, REAL, INT])
 
 # Helper Constants
@@ -471,6 +520,7 @@ class TypeManager(object):
         self._custom_types = {}
         self._custom_types_decl = {}
         self._fp_types = {}
+        self._ri_types = {}
         self._bool = None
         self._real = None
         self._int = None
@@ -602,6 +652,16 @@ class TypeManager(object):
             self._fp_types[(eb, sb)] = ty
         return ty
 
+    def RIntType(self, p):
+        """Returns the singleton associated to the RInt type for the given precision.
+        """
+        try:
+            ty = self._ri_types[p]
+        except KeyError:
+            ty = _RIntType(p)
+            self._ri_types[p] = ty
+        return ty
+
     def get_type_instance(self, type_decl, *args):
         """Creates an instance of the TypeDecl with the given arguments."""
         assert_are_types(args, __name__)
@@ -691,6 +751,11 @@ def FPType(eb, sb):
     """Returns the FP type for the given precision."""
     mgr = pysmt.environment.get_env().type_manager
     return mgr.FPType(eb, sb)
+
+def RIntType(p):
+    """Returns the BV type for the given width."""
+    mgr = pysmt.environment.get_env().type_manager
+    return mgr.RIntType(p)
 
 def Type(name, arity=0):
     """Returns the Type Declaration with the given name (sort declaration)."""

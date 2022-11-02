@@ -25,7 +25,7 @@ from itertools import chain
 from six.moves import xrange
 
 
-ALL_TYPES = list(xrange(0, 102))
+ALL_TYPES = list(xrange(0,133))
 
 (
 FORALL, EXISTS, AND, OR, NOT, IMPLIES, IFF, # Boolean Logic (0-6)
@@ -91,12 +91,22 @@ FP_FMA,                                     # Floating-Point fma operation (80)
 FP_REM,                                     # Floating-Point rem operation (81)
 FP_MIN, FP_MAX,                             # Floating-Point mim/max operations (82-83)
 FP_LEQ, FP_LT, FP_EQ,                       # Floating-Point binary relations (84-86)
-FP_IS_NORMAL, FP_IS_SUBNORMAL,              # Floating-Point normality tests (87- 88)
+FP_IS_NORMAL, FP_IS_SUBNORMAL,              # Floating-Point normality tests (87-88)
 FP_IS_ZERO, FP_IS_INFINITE, FP_IS_NAN,      # Floating-Point special value tests (89-91)
 FP_IS_NEGATIVE, FP_IS_POSITIVE,             # Floating-Point sign tests (92-93)
 FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,           # Floating-Point conversions (94-96)
-BV_TO_FP, FP_TO_FP,                         # Floating-Point conversions (97-98)
-REAL_TO_FP, INT_TO_FP, UINT_TO_FP,          # Floating-Point conversions (99-101)
+BV_TO_FP, FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, # Floating-Point conversions (97-101)
+#
+# REAL-INTERVALS
+#
+RI_ABS, RI_ADD, RI_SUB, RI_SUB_E, RI_NEG, RI_MUL, RI_DIV, # Real-Interval binary operations (102-108)
+RI_GEQ, RI_GT, RI_FPEQ, RI_ITE,             # Real-Interval binary relations (109-112)
+RI_GEQ_N, RI_GT_N, RI_FPEQ_N,               # Real-Interval binary relations (113-115)
+RI_FPIS, RI_IS, RI_EQ, RI_NEQ,              # Real-Interval assignment (116-119)
+RI_L, RI_U,                                 # Real-Interval bound values (120-121)
+RI_IS_PINF, RI_IS_NINF, RI_IS_NAI,          # Real-Interval special value tests (122-124)
+RI_ZERO, RI_PINF, RI_NINF, RI_ENTIRE, RI_NAI, # Real-Interval constants (125-129)
+RI_TO_RI, REAL_TO_RI, RI_EXACT              # Real-Interval conversions (130-132)
 ) = ALL_TYPES
 
 QUANTIFIERS = frozenset([FORALL, EXISTS])
@@ -106,9 +116,11 @@ BOOL_CONNECTIVES = frozenset([AND, OR, NOT, IMPLIES, IFF])
 BOOL_OPERATORS = frozenset(QUANTIFIERS | BOOL_CONNECTIVES)
 
 FP_CONSTANTS = frozenset([FP_CONSTANT, FP_RNE, FP_RNA, FP_RTP, FP_RTN, FP_RTZ])
-CONSTANTS = frozenset([BOOL_CONSTANT, REAL_CONSTANT, INT_CONSTANT,
+RI_CONSTANTS = frozenset([RI_ZERO, RI_PINF, RI_NINF, RI_ENTIRE, RI_NAI])
+
+CONSTANTS = frozenset([BOOL_CONSTANT, REAL_CONSTANT, INT_CONSTANT, \
                        BV_CONSTANT, STR_CONSTANT, ALGEBRAIC_CONSTANT]) | \
-            FP_CONSTANTS
+                       FP_CONSTANTS | RI_CONSTANTS
 
 # Relations are predicates on theory atoms.
 # Relations have boolean type. They are a subset of the operators for a theory
@@ -120,8 +132,10 @@ STR_RELATIONS = frozenset([STR_CONTAINS, STR_PREFIXOF, STR_SUFFIXOF])
 
 FP_RELATIONS = frozenset([FP_LEQ, FP_LT, FP_EQ])
 
+RI_RELATIONS = frozenset([RI_GEQ, RI_GT, RI_FPEQ, RI_ITE, RI_GEQ_N, RI_GT_N, RI_FPEQ_N, RI_FPIS, RI_IS, RI_EQ, RI_NEQ])
+
 RELATIONS = frozenset((EQUALS,)) | BV_RELATIONS | IRA_RELATIONS | \
-            STR_RELATIONS | FP_RELATIONS
+            STR_RELATIONS | FP_RELATIONS | RI_RELATIONS
 
 # Operators are functions that return a Theory object
 BV_OPERATORS = frozenset([BV_NOT, BV_AND, BV_OR, BV_XOR,
@@ -140,12 +154,14 @@ ARRAY_OPERATORS = frozenset([ARRAY_SELECT, ARRAY_STORE, ARRAY_VALUE])
 FP_OPERATORS = frozenset([FP_ABS, FP_NEG, FP_SQRT, FP_ROUND_TO_INTEGRAL,
                           FP_ADD, FP_SUB, FP_MUL, FP_DIV, FP_FMA, FP_REM,
                           FP_MIN, FP_MAX,
-                          FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, 
-                          FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,
+                          FP_TO_FP, REAL_TO_FP, INT_TO_FP, UINT_TO_FP, FP_TO_UBV, FP_TO_SBV, FP_TO_REAL,
                           BV_TO_FP])
 
+RI_OPERATORS = frozenset([RI_ABS, RI_ADD, RI_SUB, RI_SUB_E, RI_MUL, RI_NEG, RI_DIV, 
+                          RI_L, RI_U, RI_TO_RI, REAL_TO_RI, RI_EXACT])
+
 THEORY_OPERATORS = IRA_OPERATORS | BV_OPERATORS | ARRAY_OPERATORS | \
-                   STR_OPERATORS | FP_OPERATORS
+                   STR_OPERATORS | FP_OPERATORS | RI_OPERATORS
 
 CUSTOM_NODE_TYPES = []
 
@@ -153,8 +169,10 @@ FP_PREDICATES = frozenset([FP_IS_NORMAL, FP_IS_SUBNORMAL, FP_IS_ZERO,
                            FP_IS_INFINITE, FP_IS_NAN, FP_IS_NEGATIVE,
                            FP_IS_POSITIVE])
 
+RI_PREDICATES = frozenset([RI_IS_PINF, RI_IS_NINF, RI_IS_NAI])
+
 assert (BOOL_OPERATORS | THEORY_OPERATORS | RELATIONS | CONSTANTS | \
-        frozenset((SYMBOL, FUNCTION, ITE)) | FP_PREDICATES) == \
+        frozenset((SYMBOL, FUNCTION, ITE)) | FP_PREDICATES | RI_PREDICATES) == \
         frozenset(ALL_TYPES)
 
 assert len(BOOL_OPERATORS & THEORY_OPERATORS) == 0
@@ -295,4 +313,35 @@ __OP_STR__ = {
     FP_TO_SBV: "FP_TO_SBV",
     FP_TO_REAL: "FP_TO_REAL",
     BV_TO_FP: "BV_TO_FP",
+    RI_ABS: "RI_ABS",
+    RI_ADD: "RI_ADD",
+    RI_SUB: "RI_SUB",
+    RI_SUB_E: "RI_SUB_E",
+    RI_NEG: "RI_NEG",
+    RI_MUL: "RI_MUL",
+    RI_DIV: "RI_DIV",
+    RI_L: "RI_L",
+    RI_U: "RI_U",
+    RI_GEQ: "RI_GEQ",
+    RI_GT: "RI_GT",
+    RI_FPEQ: "RI_FPEQ",
+    RI_ITE: "RI_ITE",
+    RI_GEQ_N: "RI_GEQ_N",
+    RI_GT_N: "RI_GT_N",
+    RI_FPEQ_N: "RI_FPEQ_N",
+    RI_FPIS: "RI_FPIS",
+    RI_IS: "RI_IS",
+    RI_EQ: "RI_EQ",
+    RI_NEQ: "RI_NEQ",
+    RI_IS_PINF: "RI_IS_PINF",
+    RI_IS_NINF: "RI_IS_NINF",
+    RI_IS_NAI: "RI_IS_NAI",
+    RI_ZERO: "RI_ZERO",
+    RI_PINF: "RI_PINF",
+    RI_NINF: "RI_NINF",
+    RI_ENTIRE: "RI_ENTIRE",
+    RI_NAI: "RI_NAI",
+    RI_TO_RI: "RI_TO_RI",
+    REAL_TO_RI: "REAL_TO_RI",
+    RI_EXACT: "RI_EXACT",
 }

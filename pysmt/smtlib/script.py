@@ -25,10 +25,15 @@ import pysmt.smtlib.commands as smtcmd
 from pysmt.exceptions import (UnknownSmtLibCommandError, NoLogicAvailableError,
                               UndefinedLogicError, PysmtValueError)
 from pysmt.smtlib.printers import SmtPrinter, SmtDagPrinter, quote
+from pysmt.smtlib.printer_decompose import SmtDecomposePrinter
 from pysmt.oracles import get_logic
-from pysmt.logics import get_closer_smtlib_logic, Logic, SMTLIB2_LOGICS
+from pysmt.logics import get_closer_smtlib_logic, Logic, SMTLIB2_LOGICS, QF_LRIA
 from pysmt.environment import get_env
-
+from pysmt.smtlib.script_rint import *
+from pysmt.smtlib.script_rint_decompose import *
+import pysmt.smtlib.script_rint_mp as mp
+import pysmt.smtlib.script_rint_mp_decompose as mp_d
+from pysmt.typing import BOOL, REAL
 
 def check_sat_filter(log):
     """
@@ -42,7 +47,7 @@ def check_sat_filter(log):
 
 
 class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
-    def serialize(self, outstream=None, printer=None, daggify=True):
+    def serialize(self, outstream=None, printer=None, daggify=True, decompose=False, dplus=True, precs=[], pr_pr=True):
         """Serializes the SmtLibCommand into outstream using the given printer.
 
         Exactly one of outstream or printer must be specified. When
@@ -52,68 +57,237 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
         a tree printing is done.
 
         """
+        multi_prec = len(precs) >= 2
 
         if (outstream is None) and (printer is not None):
             outstream = printer.stream
         elif (outstream is not None) and (printer is None):
-            if daggify:
-                printer = SmtDagPrinter(outstream)
+            if decompose:
+                printer = SmtDecomposePrinter(outstream, dplus=dplus, multi_prec=multi_prec)
+            elif daggify:
+                printer = SmtDagPrinter(outstream, multi_prec=multi_prec)
             else:
-                printer = SmtPrinter(outstream)
+                printer = SmtPrinter(outstream, multi_prec=multi_prec)
         else:
             assert (outstream is not None and printer is not None) or \
                    (outstream is None and printer is None), \
                    "Exactly one of outstream and printer must be set."
 
         if self.name == smtcmd.SET_LOGIC:
-            outstream.write("(%s %s)" % (self.name, self.args[0]))
+            if self.args[0] == QF_LRIA:
+                if pr_pr:
+                    if not multi_prec:
+                        outstream.write(rint_param_decls)
+                        #if len(precs) > 0:
+                        assert_rint_param_values(outstream, precs[0][0], precs[0][1])
+                    else:
+                        outstream.write(mp.rint_param_decls)
+                        mp.assert_rint_param_values(outstream, precs)
+                else:
+                    outstream.write("\n;; The definitions of ri constants should be done by the user.\n") 
 
-        if self.name == smtcmd.SET_OPTION:
+                if not multi_prec:
+                    if not decompose:
+                        define_rint_rnd_funs(outstream, precs, pr_pr)
+                        outstream.write(rint_prologue)
+                        if dplus:
+                            outstream.write(rint_prologue_p)
+                        else:
+                            outstream.write(rint_prologue_m)
+                    else:
+                        outstream.write(rint_d_prologue)
+                        if dplus:
+                            outstream.write(rint_d_prologue_p)
+                        else:
+                            outstream.write(rint_d_prologue_m)
+                else:
+                    if not decompose:
+                        mp.define_rint_rnd_funs(outstream, precs, pr_pr)
+                        outstream.write(mp.rint_prologue)
+                        if dplus:
+                            outstream.write(mp.rint_prologue_p)
+                        else:
+                            outstream.write(mp.rint_prologue_m)
+                    else:
+                        outstream.write(mp_d.rint_prologue)
+                        if dplus:
+                            outstream.write(mp_d.rint_d_prologue_p)
+                        else:
+                            outstream.write(mp_d.rint_d_prologue_m)
+            else:
+                outstream.write("(%s %s)" % (self.name, self.args[0]))
+
+        elif self.name == smtcmd.SET_OPTION:
             outstream.write("(%s %s %s)" % (self.name,self.args[0],self.args[1]))
 
         elif self.name == smtcmd.SET_INFO:
-            outstream.write("(%s %s %s)" % (self.name,self.args[0],
-                                            quote(self.args[1])))
+            if self.args[0] == ':status':
+                pfx = ';'
+            else:
+                pfx = ''
+            outstream.write("%s(%s %s %s)" % (pfx, self.name, self.args[0],
+                                              quote(self.args[1])))
 
         elif self.name == smtcmd.ASSERT:
-            outstream.write("(%s " % self.name)
-            printer.printer(self.args[0])
-            outstream.write(")")
+            if not decompose:
+                outstream.write("(%s " % self.name)
+                printer.printer(self.args[0])
+                outstream.write(")")
+            else:
+                r = printer.printer(self.args[0])
+                outstream.write("(%s %s)" % (self.name, r))
 
         elif self.name == smtcmd.GET_VALUE:
-            outstream.write("(%s (" % self.name)
-            for a in self.args:
-                printer.printer(a)
-                outstream.write(" ")
-            outstream.write("))")
+            if not decompose:
+                outstream.write("(%s (" % self.name)
+                printer.printer(self.args[0])
+                for a in self.args[1:]:
+                    outstream.write(" ")
+                    printer.printer(a)
+                outstream.write("))")
+            else:
+                r = []
+                for a in self.args:
+                    r.append( printer.printer(a) )
+
+                outstream.write("(%s (%s" % (self.name, r[0]))
+                for k in r[1:]:
+                    outstream.write(" %s" % k)
+                outstream.write("))")
 
         elif self.name in [smtcmd.CHECK_SAT, smtcmd.EXIT,
                            smtcmd.RESET_ASSERTIONS, smtcmd.GET_UNSAT_CORE,
                            smtcmd.GET_ASSIGNMENT, smtcmd.GET_MODEL]:
             outstream.write("(%s)" % self.name)
 
-        elif self.name == smtcmd.SET_LOGIC:
-            outstream.write("(%s %s)" % (self.name, self.args[0]))
-
         elif self.name in [smtcmd.DECLARE_FUN, smtcmd.DECLARE_CONST]:
             symbol = self.args[0]
-            type_str = symbol.symbol_type().as_smtlib()
-            outstream.write("(%s %s %s)" % (self.name,
-                                            quote(symbol.symbol_name()),
-                                            type_str))
+            type_str = symbol.symbol_type().as_smtlib(self.name == smtcmd.DECLARE_FUN)
+
+            if decompose and symbol.symbol_type().is_ri_type():
+                #type_str = "Real"
+                type_str = REAL.as_smtlib(self.name == smtcmd.DECLARE_FUN)
+
+            if decompose and symbol.symbol_type().is_function_type():
+                raise NotImplementedError("encoding function type is not supported!")
+
+            if symbol.symbol_type().is_ri_type():
+                if decompose:
+                    if dplus:
+                        outstream.write("(%s %s %s)\n" % (self.name,
+                                                        quote(symbol.symbol_name() + '.l'),
+                                                        type_str))
+                        outstream.write("(%s %s %s)\n" % (self.name,
+                                                        quote(symbol.symbol_name() + '.u'),
+                                                        type_str))
+                        if not symbol.ri_is_alias():
+                            if not multi_prec:
+                                outstream.write("\n(assert (<= %s (ri.r_dn %s)))\n" % (
+                                                                quote(symbol.symbol_name() + '.l'),
+                                                                quote(symbol.symbol_name() + '.u') ))
+                            else:
+                                outstream.write("\n(assert (<= %s (ri.r_dn %d %s)))\n" % (
+                                                                quote(symbol.symbol_name() + '.l'),
+                                                                symbol.get_type().precision,
+                                                                quote(symbol.symbol_name() + '.u') ))
+        
+                        outstream.write("(%s %s %s)" 
+                                % ( self.name, quote(symbol.symbol_name() + '.p_nan'), 
+                                    BOOL.as_smtlib(self.name == smtcmd.DECLARE_FUN) ) )
+
+                    else: # dminus
+                        outstream.write("(%s %s %s)" % (self.name,
+                                                        quote(symbol.symbol_name()),
+                                                        type_str))
+    
+                        outstream.write("\n(%s %s %s)" 
+                                % ( self.name, quote(symbol.symbol_name() + '.p_nan'), 
+                                    BOOL.as_smtlib(self.name == smtcmd.DECLARE_FUN) ) )
+    
+                else: # not decompose
+                    outstream.write("(%s %s %s)" % (self.name,
+                                                    quote(symbol.symbol_name()),
+                                                    type_str))
+    
+                    if dplus:
+                        # l <= u
+                        #rel = self.mgr.LE(self.mgr.RILower(symb), self.mgr.RIUpper(symb))
+                        #constr.append( SmtLibCommand(smtcmd.ASSERT, [rel]) )
+                        outstream.write("\n(assert (<= (ri.l %s) (ri.u %s)))" % (
+                            quote(symbol.symbol_name()),
+                            quote(symbol.symbol_name()) ))
+
+                        if not symbol.ri_is_alias():
+                            if not multi_prec:
+                                outstream.write("\n(assert (<= (ri.l %s) (ri.r_dn (ri.u %s))))" % (
+                                                                quote(symbol.symbol_name()),
+                                                                quote(symbol.symbol_name()) ))
+                            else:
+                                outstream.write("\n(assert (<= (ri.l %s) (ri.r_dn %d (ri.u %s))))" % (
+                                                                quote(symbol.symbol_name()),
+                                                                symbol.get_type().precision,
+                                                                quote(symbol.symbol_name()) ))
+
+                    else: # dminus
+                        if not symbol.ri_is_alias():
+                            # l = u
+                            outstream.write("\n(assert (= (ri.l %s) (ri.u %s)))" % (
+                                quote(symbol.symbol_name()),
+                                quote(symbol.symbol_name()) ))
+    
+                #outstream.write("\n")
+
+            else: # not RInt
+                outstream.write("(%s %s %s)" % ( self.name,
+                                                 quote(symbol.symbol_name()),
+                                                 type_str ))
 
         elif self.name == smtcmd.DEFINE_FUN:
+            rtype = self.args[2]
+
+            #if decompose and rtype.is_ri_type():
+            #    raise NotImplementedError("encoding define-fun (whose cod is RInt) is not supported!")
+
             name = self.args[0]
             params_list = self.args[1]
-            params = " ".join(["(%s %s)" % (v, v.symbol_type()) for v in params_list])
-            rtype = self.args[2]
-            expr = self.args[3]
-            outstream.write("(%s %s (%s) %s " % (self.name,
-                                                name,
-                                                params,
-                                                rtype))
-            printer.printer(expr)
-            outstream.write(")")
+            #params = " ".join(["(%s %s)" % (v, v.symbol_type().as_smtlib(funstyle=False)) for v in params_list])
+
+            # TODO
+            # Seems like function defs are inlined for most cases...
+            # So, okay to skip?
+            #if len(params_list) > 0:
+            outstream.write(";; %s of %s skipped..." % (self.name, name))
+            return
+
+            #rtype = self.args[2]
+            #outstream.write("(%s %s (%s) %s " % (self.name,
+            #                                    name,
+            #                                    params,
+            #                                    rtype.as_smtlib(funstyle=False)))
+
+            #if not rtype.is_ri_type() or not decompose:
+            #    outstream.write("(decl-const %s () %s)" % ( name, params,
+            #                                        rtype.as_smtlib(funstyle=False) ))
+
+            #    outstream.write("(assert (= %s " % name)
+            #    printer.printer(self.args[3])
+            #    outstream.write(")")
+            #else:
+            #    if dplus:
+            #        outstream.write("(declare-const %s %s)\n" % (name+'.l', REAL))
+            #        outstream.write("(declare-const %s %s)\n" % (name+'.u', REAL))
+            #        outstream.write("(assert (= %s %s))\n" % (name+'.l', name+'.u'))
+            #    else:
+            #        outstream.write("(declare-const %s %s)\n" % (name, REAL))
+            #    outstream.write("(declare-const %s %s)\n" % (name+'.p_nan', BOOL))
+
+            #    d = printer.printer(self.args[3])
+            #    if dplus:
+            #        outstream.write("(assert (= %s %s))\n" % (name+'.l', d+'.l'))
+            #        outstream.write("(assert (= %s %s))\n" % (name+'.u', d+'.u'))
+            #    else:
+            #        outstream.write("(assert (= %s %s))\n" % (name, d))
+            #    outstream.write("(assert (= %s %s))" % (name+'.p_nan', d+'.p_nan'))
 
         elif self.name in [smtcmd.PUSH, smtcmd.POP]:
             outstream.write("(%s %d)" % (self.name, self.args[0]))
@@ -140,9 +314,9 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
         else:
             raise UnknownSmtLibCommandError(self.name)
 
-    def serialize_to_string(self, daggify=True):
+    def serialize_to_string(self, daggify=True, decompose=False):
         buf = cStringIO()
-        self.serialize(buf, daggify=daggify)
+        self.serialize(buf, daggify=daggify, decompose=decompose)
         return buf.getvalue()
 
 
@@ -151,6 +325,7 @@ class SmtLibScript(object):
     def __init__(self):
         self.annotations = None
         self.commands = []
+        self.precisions = {}
 
     def add(self, name, args):
         """Adds a new SmtLibCommand with the given name and arguments."""
@@ -159,6 +334,12 @@ class SmtLibScript(object):
 
     def add_command(self, command):
         self.commands.append(command)
+
+    def add_precision(self, k, eb, sb):
+        self.precisions[k] = (eb, sb)
+
+    def get_precision(self, k):
+        return self.precisions[k]
 
     def evaluate(self, solver):
         log = []
@@ -224,19 +405,22 @@ class SmtLibScript(object):
 
         return _And(stack)
 
-    def to_file(self, fname, daggify=True):
+    def to_file(self, fname, daggify=True, decompose=False, dplus=True):
         with open(fname, "w") as outstream:
-            self.serialize(outstream, daggify=daggify)
+            self.serialize(outstream, daggify=daggify, decompose=decompose, dplus=dplus)
 
-    def serialize(self, outstream, daggify=True):
+    def serialize(self, outstream, daggify=True, decompose=False, dplus=True, precs=[], pr_pr=True):
         """Serializes the SmtLibScript expanding commands"""
-        if daggify:
-            printer = SmtDagPrinter(outstream)
+        multi_prec = len(precs) >= 2
+        if decompose:
+            printer = SmtDecomposePrinter(outstream, dplus=dplus, multi_prec=multi_prec)
+        elif daggify:
+            printer = SmtDagPrinter(outstream, multi_prec=multi_prec)
         else:
-            printer = SmtPrinter(outstream)
+            printer = SmtPrinter(outstream, multi_prec=multi_prec)
 
         for cmd in self.commands:
-            cmd.serialize(printer=printer)
+            cmd.serialize(printer=printer, daggify=daggify, decompose=decompose, dplus=dplus, precs=precs, pr_pr=pr_pr)
             outstream.write("\n")
 
     def __len__(self):
@@ -341,7 +525,6 @@ def evaluate_command(cmd, solver):
         return solver.define_fun(var, formals, typename, body)
 
     elif cmd.name == smtcmd.ECHO:
-        print(cmd.args[0])
         return None
 
     elif cmd.name == smtcmd.CHECK_SAT_ASSUMING:

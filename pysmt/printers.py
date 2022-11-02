@@ -372,6 +372,83 @@ class HRPrinter(TreeWalker):
     def walk_fp_is_positive(self, formula):
         return self.walk_fp_op(formula, 'fp.isPositive')
 
+    def walk_fp_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_fp_unsigned(self, formula):
+        self.write("((_ to_fp_unsigned %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_bv_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(")")
+    def walk_real_to_fp(self, formula):
+        self.write("((_ to_fp %d %d) " % (formula.fp_eb(), formula.fp_sb()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+
+    def walk_fp_to_ubv(self, formula):
+        self.write("((_ fp.to_ubv %d) " % (formula.bv_width()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_sbv(self, formula):
+        self.write("((_ fp.to_sbv %d) " % (formula.fp_m()))
+        yield formula.arg(0)
+        self.write(" ")
+        yield formula.arg(1)
+        self.write(")")
+    def walk_fp_to_real(self, formula): return self.walk_fp_op(formula, "fp.to_real")
+
+    # RealInterval
+
+    def walk_ri_op(self, formula, op):
+        self.write(op)
+        self.write("(")
+        args = formula.args()
+        for s in args[:-1]:
+            yield s
+            self.write(', ')
+        yield args[-1]
+        self.write(")")
+
+    def walk_ri_l(self, formula): return self.walk_ri_op(formula, "ri.l")
+    def walk_ri_u(self, formula): return self.walk_ri_op(formula, "ri.u")
+    def walk_ri_is_pinf(self, formula): return self.walk_ri_op(formula, "is_pinf")
+    def walk_ri_is_ninf(self, formula): return self.walk_ri_op(formula, "is_ninf")
+    def walk_ri_is_nai(self, formula): return self.walk_ri_op(formula, "is_nai")
+    def walk_ri_add(self, formula): return self.walk_ri_op(formula, "ri.add")
+    def walk_ri_sub(self, formula): return self.walk_ri_op(formula, "ri.sub")
+    def walk_ri_sub_e(self, formula): return self.walk_ri_op(formula, "ri.sub_exact")
+    def walk_ri_neg(self, formula): return self.walk_ri_op(formula, "ri.neg")
+    def walk_ri_mul(self, formula): return self.walk_ri_op(formula, "ri.mul")
+    def walk_ri_div(self, formula): return self.walk_ri_op(formula, "ri.div")
+    def walk_ri_geq(self, formula): return self.walk_ri_op(formula, "ri.geq")
+    def walk_ri_gt(self, formula): return self.walk_ri_op(formula, "ri.gt")
+    def walk_ri_fpeq(self, formula): return self.walk_ri_op(formula, "ri.fpeq")
+    def walk_ri_ite(self, formula): return self.walk_ri_op(formula, "ri.ite")
+    def walk_ri_geq_n(self, formula): return self.walk_ri_op(formula, "ri.geq-")
+    def walk_ri_gt_n(self, formula): return self.walk_ri_op(formula, "ri.gt-")
+    def walk_ri_fpeq_n(self, formula): return self.walk_ri_op(formula, "ri.fpeq-")
+    def walk_ri_fpis(self, formula): return self.walk_ri_op(formula, "ri.fpis")
+    def walk_ri_is(self, formula): return self.walk_ri_op(formula, "ri.is")
+    def walk_ri_eq(self, formula): return self.walk_ri_op(formula, "ri.eq")
+    def walk_ri_neq(self, formula): return self.walk_ri_op(formula, "ri.neq")
+    def walk_ri_zero(self, formula): return self.write("ri.zero")
+    def walk_ri_entire(self, formula): return self.write("ri.entire")
+    def walk_ri_nai(self, formula): return self.write("ri.nai")
+    def walk_ri_to_ri(self, formula): return self.walk_ri_op(formula, "ri.to_ri")
+    def walk_ri_exact(self, formula): return self.walk_ri_op(formula, "ri.exact")
+
 #EOC HRPrinter
 
 
