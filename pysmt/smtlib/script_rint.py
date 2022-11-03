@@ -76,8 +76,8 @@ rint_prologue = '''
 )
 
 (define-fun ri.abs ((x RInt)) RInt
-  (let ( (l (ite (>= (ri.l x) 0) (ri.u x) (ite (> (ri.u x) (- (ri.l x))) (ri.u x) (- (ri.l x)))))
-         (u (ite (>= (ri.l x) 0) (ri.l x) (ite (< (ri.u x) 0) (- (ri.u x)) 0))) )
+  (let ( (l (ite (>= (ri.l x) 0) (ri.l x) (ite (>= (ri.u x) 0) 0 (- (ri.u x)))))
+         (u (ite (>= (ri.u x) (- (ri.l x))) (ri.u x) (- (ri.l x)))) )
     (tpl l u (p_nan x) ) ) )
 
 (define-fun ri.neg ((x RInt)) RInt

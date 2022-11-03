@@ -45,6 +45,7 @@ class TestLogic(TestCase):
                               arrays_const=l.theory.arrays_const,
                               bit_vectors=l.theory.bit_vectors,
                               floating_point=l.theory.floating_point,
+                              real_interval=l.theory.real_interval,
                               integer_arithmetic=l.theory.integer_arithmetic,
                               real_arithmetic=l.theory.real_arithmetic,
                               integer_difference=l.theory.integer_difference,

@@ -16,7 +16,6 @@
 #   limitations under the License.
 #
 from warnings import warn
-from six.moves import xrange
 
 from pysmt.exceptions import SolverAPINotFound
 from pysmt.constants import Fraction, is_pysmt_fraction, is_pysmt_integer
@@ -239,33 +238,30 @@ class MathSAT5Solver(IncrementalTrackingSolver, UnsatCoreSolver,
     @clear_pending_pop
     def _solve(self, assumptions=None):
         res = None
+        bool_ass = []
+        other_ass = []
+        for x in assumptions if assumptions is not None else []:
+            if x.is_literal():
+                bool_ass.append(self.converter.convert(x))
+            else:
+                other_ass.append(x)
+        if len(other_ass) > 0:
+            self.push()
+            # this introduces new named assertions if named unsat cores.
+            self.add_assertion(self.mgr.And(other_ass))
 
         n_ass = self._named_assertions()
         if n_ass is not None and len(n_ass) > 0:
-            if assumptions is None:
-                assumptions = n_ass
-            else:
-                assumptions += n_ass
+            assert all(s.is_literal() for s in n_ass)
+            bool_ass.extend(self.converter.convert(x) for x in n_ass)
 
-        if assumptions is not None:
-            bool_ass = []
-            other_ass = []
-            for x in assumptions:
-                if x.is_literal():
-                    bool_ass.append(self.converter.convert(x))
-                else:
-                    other_ass.append(x)
+        if len(other_ass) > 0:
+            # we do this after getting the named_assertions because
+            # attribute assertions has annotation clear_pending_pop
+            self.pending_pop = True
 
-            if len(other_ass) > 0:
-                self.push()
-                self.add_assertion(self.mgr.And(other_ass))
-                self.pending_pop = True
-
-            if len(bool_ass) > 0:
-                res = mathsat.msat_solve_with_assumptions(self.msat_env(), bool_ass)
-            else:
-                res = mathsat.msat_solve(self.msat_env())
-
+        if len(bool_ass) > 0:
+            res = mathsat.msat_solve_with_assumptions(self.msat_env(), bool_ass)
         else:
             res = mathsat.msat_solve(self.msat_env())
 
@@ -325,12 +321,12 @@ class MathSAT5Solver(IncrementalTrackingSolver, UnsatCoreSolver,
 
     @clear_pending_pop
     def _push(self, levels=1):
-        for _ in xrange(levels):
+        for _ in range(levels):
             mathsat.msat_push_backtrack_point(self.msat_env())
 
     @clear_pending_pop
     def _pop(self, levels=1):
-        for _ in xrange(levels):
+        for _ in range(levels):
             mathsat.msat_pop_backtrack_point(self.msat_env())
 
     def _var2term(self, var):
@@ -734,12 +730,12 @@ class MSatConverter(Converter, DagWalker):
             if current not in self.back_memoization:
                 self.back_memoization[current] = None
                 stack.append(current)
-                for i in xrange(arity):
+                for i in range(arity):
                     son = mathsat.msat_term_get_arg(current, i)
                     stack.append(son)
             elif self.back_memoization[current] is None:
                 args=[self.back_memoization[mathsat.msat_term_get_arg(current,i)]
-                      for i in xrange(arity)]
+                      for i in range(arity)]
 
                 signature = self._get_signature(current, args)
                 new_args = []
@@ -825,6 +821,14 @@ class MSatConverter(Converter, DagWalker):
     def walk_int_constant(self, formula, **kwargs):
         assert is_pysmt_integer(formula.constant_value())
         rep = str(formula.constant_value())
+        return mathsat.msat_make_number(self.msat_env(), rep)
+
+    def walk_algebraic_constant(self, formula, **kwargs):
+        val = formula.constant_value()
+        if val.is_irrational():
+            raise ConvertExpressionError("Cannot convert irrational constant")
+        num, den = val.numerator(), val.denominator()
+        rep = "{}/{}".format(str(num), str(den))
         return mathsat.msat_make_number(self.msat_env(), rep)
 
     def walk_bool_constant(self, formula, **kwargs):
@@ -1249,7 +1253,7 @@ class MSatInterpolator(Interpolator):
                 return None
 
             pysmt_ret = []
-            for i in xrange(1, len(groups)):
+            for i in range(1, len(groups)):
                 itp = mathsat.msat_get_interpolant(env, groups[:i])
                 f = self.converter.back(itp)
                 pysmt_ret.append(f)
@@ -1302,7 +1306,7 @@ class MSatBoolUFRewriter(IdentityDagWalker):
 
         # Base-case
         stack = []
-        for i in xrange(2**len(bool_args)):
+        for i in range(2**len(bool_args)):
             fname = self.mgr.Symbol("%s#%i" % (formula.function_name(),i), ftype)
             if len(ptype) == 0:
                 stack.append(fname)

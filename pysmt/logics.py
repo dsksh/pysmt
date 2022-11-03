@@ -19,7 +19,6 @@
 the SMTLIB and provides methods to compare and search for particular
 logics.
 """
-import six
 
 from pysmt.exceptions import UndefinedLogicError, NoLogicAvailableError
 
@@ -31,6 +30,7 @@ class Theory(object):
                  arrays_const = None,
                  bit_vectors = None,
                  floating_point = None,
+                 real_interval = None,
                  integer_arithmetic = None,
                  real_arithmetic = None,
                  integer_difference = None,
@@ -43,6 +43,7 @@ class Theory(object):
         self.arrays_const = arrays_const or False
         self.bit_vectors = bit_vectors or False
         self.floating_point = floating_point or False
+        self.real_interval = real_interval or False
         self.integer_arithmetic = integer_arithmetic or False
         self.real_arithmetic = real_arithmetic or False
         self.integer_difference = integer_difference or False
@@ -96,6 +97,7 @@ class Theory(object):
                             arrays_const = self.arrays_const,
                             bit_vectors = self.bit_vectors,
                             floating_point = self.floating_point,
+                            real_interval = self.real_interval,
                             integer_arithmetic = self.integer_arithmetic,
                             real_arithmetic = self.real_arithmetic,
                             integer_difference = self.integer_difference,
@@ -132,6 +134,7 @@ class Theory(object):
             arrays_const=self.arrays_const or other.arrays_const,
             bit_vectors=self.bit_vectors or other.bit_vectors,
             floating_point=self.floating_point or other.floating_point,
+            real_interval=self.real_interval or other.real_interval,
             integer_arithmetic=self.integer_arithmetic or other.integer_arithmetic,
             real_arithmetic=self.real_arithmetic or other.real_arithmetic,
             integer_difference=integer_difference,
@@ -148,6 +151,7 @@ class Theory(object):
                 self.arrays_const == other.arrays_const and
                 self.bit_vectors == other.bit_vectors and
                 self.floating_point == other.floating_point and
+                self.real_interval == other.real_interval and
                 self.integer_arithmetic == other.integer_arithmetic and
                 self.real_arithmetic == other.real_arithmetic and
                 self.integer_difference == other.integer_difference and
@@ -190,6 +194,7 @@ class Theory(object):
                 self.arrays_const <= other.arrays_const and
                 self.bit_vectors <= other.bit_vectors and
                 self.floating_point <= other.floating_point and
+                self.real_interval <= other.real_interval and
                 self.uninterpreted <= other.uninterpreted and
                 self.custom_type <= other.custom_type and
                 le_integer_difference and
@@ -204,6 +209,7 @@ class Theory(object):
                 "ArraysConst: %s, " % self.arrays_const +
                 "BV: %s, " % self.bit_vectors +
                 "FP: %s, " % self.floating_point +
+                "RI: %s, " % self.real_interval + 
                 "IA: %s, " % self.integer_arithmetic +
                 "RA: %s, " % self.real_arithmetic +
                 "ID: %s, " % self.integer_difference +
@@ -598,6 +604,7 @@ UFNIA = Logic(name="UFNIA",
               description=\
 """Non-linear integer arithmetic with uninterpreted sort and function
 symbols.""",
+              integer_arithmetic=True,
               integer_difference=True,
               linear=False,
               uninterpreted=True)
@@ -642,7 +649,8 @@ QF_LRIA = Logic(name="QF_LRIA",
               '''Closed quantifier-free formulas over the theory of real intervals.''',
               linear=True,
               quantifier_free=True,
-              real_arithmetic=True)
+              real_arithmetic=True,
+              real_interval=True)
 
 
 AUTO = Logic(name="Auto",
@@ -682,10 +690,9 @@ SMTLIB2_LOGICS = frozenset([ AUFLIA,
                              QF_SLIA,
                              QF_FP,
                              QF_BVFP,
-                             QF_LRIA,
                          ])
 
-LOGICS = SMTLIB2_LOGICS | frozenset([ QF_BOOL, BOOL, QF_AUFBVLIRA])
+LOGICS = SMTLIB2_LOGICS | frozenset([ QF_BOOL, BOOL, QF_AUFBVLIRA, QF_LRIA])
 
 QF_LOGICS = frozenset(_l for _l in LOGICS if _l.quantifier_free)
 
@@ -754,7 +761,7 @@ def convert_logic_from_string(name):
 
     This takes a logic or a string or None, and returns a logic or None.
     """
-    if name is not None and isinstance(name, six.string_types):
+    if name is not None and isinstance(name, str):
         name = get_logic_by_name(name)
     return name
 
@@ -772,6 +779,7 @@ def get_logic(quantifier_free=False,
               arrays_const=False,
               bit_vectors=False,
               floating_point=False,
+              real_interval=False,
               integer_arithmetic=False,
               real_arithmetic=False,
               integer_difference=False,
@@ -791,6 +799,7 @@ def get_logic(quantifier_free=False,
             logic.theory.arrays_const == arrays_const and
             logic.theory.bit_vectors == bit_vectors and
             logic.theory.floating_point == floating_point and
+            logic.theory.real_interval == real_interval and
             logic.theory.integer_arithmetic == integer_arithmetic and
             logic.theory.real_arithmetic == real_arithmetic and
             logic.theory.integer_difference == integer_difference and

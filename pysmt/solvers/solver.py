@@ -15,8 +15,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-from six.moves import xrange
-
 from pysmt.typing import BOOL
 from pysmt.solvers.options import SolverOptions
 from pysmt.decorators import clear_pending_pop
@@ -202,25 +200,9 @@ class Solver(object):
         """Add assertion to the solver."""
         raise NotImplementedError
 
-    def solve(self, assumptions=None):
-        """Returns the satisfiability value of the asserted formulas.
-
-        Assumptions is a list of Boolean variables or negations of
-        boolean variables. If assumptions is specified, the
-        satisfiability result is computed assuming that all the
-        specified literals are True.
-
-        A call to solve([a1, ..., an]) is functionally equivalent to:
-
-        push()
-        add_assertion(And(a1, ..., an))
-        res = solve()
-        pop()
-        return res
-
-        but is in general more efficient.
-        """
-        raise NotImplementedError
+    def add_assertions(self, formulae):
+        for formula in formulae:
+            self.add_assertion(formula)
 
     def print_model(self, name_filter=None):
         """Prints the model (if one exists).
@@ -349,6 +331,7 @@ class IncrementalTrackingSolver(Solver):
 
     def reset_assertions(self):
         self._reset_assertions()
+        self._assertion_stack = []
         self._last_command = "reset_assertions"
 
     def _add_assertion(self, formula, named=None):
@@ -389,7 +372,7 @@ class IncrementalTrackingSolver(Solver):
     def push(self, levels=1):
         self._push(levels=levels)
         point = len(self._assertion_stack)
-        for _ in xrange(levels):
+        for _ in range(levels):
             self._backtrack_points.append(point)
         self._last_command = "push"
 
@@ -398,7 +381,7 @@ class IncrementalTrackingSolver(Solver):
 
     def pop(self, levels=1):
         self._pop(levels=levels)
-        for _ in xrange(levels):
+        for _ in range(levels):
             point = self._backtrack_points.pop()
             self._assertion_stack = self._assertion_stack[0:point]
         self._last_command = "pop"
@@ -495,6 +478,45 @@ class Model(object):
             v = self.get_py_value(f, model_completion=model_completion)
             res[f] = v
         return res
+
+    def satisfies(self, formula, solver=None):
+        """Checks whether the model satisfies the formula.
+
+        The optional solver argument is used to complete partial
+        models.
+        """
+
+        subs = self.get_values(formula.get_free_variables())
+        simp = formula.substitute(subs).simplify()
+        if simp.is_true():
+            return True
+        if simp.is_false():
+            return False
+
+        free_vars = simp.get_free_variables()
+        if  len(free_vars) > 0:
+            # Partial model
+            return False
+
+        if self.environment.enable_div_by_0 and solver is not None:
+            # Models might not be simplified to a constant value
+            # if there is a division by zero. We find the
+            # division(s) and ask the solver for a replacement
+            # expression.
+            stack = [simp]
+            div_0 = []
+            while stack:
+                x = stack.pop()
+                if x.is_constant():
+                    pass
+                elif x.is_div() and x.arg(1).is_zero():
+                    div_0.append(x)
+                stack += x.args()
+
+            subs = self.get_values(div_0)
+            simp = simp.substitute(subs).simplify()
+            return simp.is_true()
+        return False
 
     @property
     def converter(self):

@@ -58,10 +58,10 @@ rint_prologue = '''
 ;; abs
 
 (define-fun ri.abs.l ( (p Int) (x.l Real) (x.u Real) (x.p_nan Bool) ) Real
-  (ite (>= x.l 0.0) x.u (ite (> x.u (- x.l)) x.u (- x.l))) )
+  (ite (>= x.l 0.0) x.l (ite (>= x.u 0.0) 0.0 (- x.u))) )
 
 (define-fun ri.abs.u ( (p Int) (x.l Real) (x.u Real) (x.p_nan Bool) ) Real
-  (ite (>= x.l 0.0) x.l (ite (< x.u 0.0) (- x.u) 0.0)) )
+  (ite (>= x.u (- x.l)) x.u (- x.l)) )
 
 (define-fun ri.abs.p_nan ( (p Int) (x.l Real) (x.u Real) (x.p_nan Bool) ) Bool
   x.p_nan )

@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-from six.moves import cStringIO
+from io import StringIO
 
 import pysmt.operators as op
 from pysmt.walkers import TreeWalker
@@ -466,7 +466,7 @@ class HRSerializer(object):
         'printer' is the printer to call to perform the serialization.
         'threshold' is the thresholding value for the printing function.
         """
-        buf = cStringIO()
+        buf = StringIO()
         if printer is None:
             p = self.PrinterClass(buf)
         else:
@@ -515,7 +515,7 @@ class SmartPrinter(HRPrinter):
 
 def smart_serialize(formula, subs=None, threshold=None):
     """Creates and calls a SmartPrinter to perform smart serialization."""
-    buf = cStringIO()
+    buf = StringIO()
     p = SmartPrinter(buf, subs=subs)
     p.printer(formula, threshold=threshold)
     res = buf.getvalue()

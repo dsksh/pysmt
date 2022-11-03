@@ -18,8 +18,7 @@
 
 import warnings
 from collections import namedtuple
-from six.moves import cStringIO
-from six.moves import xrange
+from io import StringIO
 
 import pysmt.smtlib.commands as smtcmd
 from pysmt.exceptions import (UnknownSmtLibCommandError, NoLogicAvailableError,
@@ -47,7 +46,8 @@ def check_sat_filter(log):
 
 
 class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
-    def serialize(self, outstream=None, printer=None, daggify=True, decompose=False, dplus=True, precs=[], pr_pr=True):
+    def serialize(self, outstream=None, printer=None, daggify=True, 
+                  decompose=False, dplus=True, precs=[], pr_pr=True):
         """Serializes the SmtLibCommand into outstream using the given printer.
 
         Exactly one of outstream or printer must be specified. When
@@ -243,51 +243,25 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
                                                  type_str ))
 
         elif self.name == smtcmd.DEFINE_FUN:
-            rtype = self.args[2]
-
-            #if decompose and rtype.is_ri_type():
-            #    raise NotImplementedError("encoding define-fun (whose cod is RInt) is not supported!")
-
             name = self.args[0]
-            params_list = self.args[1]
-            #params = " ".join(["(%s %s)" % (v, v.symbol_type().as_smtlib(funstyle=False)) for v in params_list])
 
             # TODO
             # Seems like function defs are inlined for most cases...
             # So, okay to skip?
-            #if len(params_list) > 0:
-            outstream.write(";; %s of %s skipped..." % (self.name, name))
-            return
+            if decompose:
+                outstream.write(";; %s of %s skipped..." % (self.name, name))
+                return
 
-            #rtype = self.args[2]
-            #outstream.write("(%s %s (%s) %s " % (self.name,
-            #                                    name,
-            #                                    params,
-            #                                    rtype.as_smtlib(funstyle=False)))
-
-            #if not rtype.is_ri_type() or not decompose:
-            #    outstream.write("(decl-const %s () %s)" % ( name, params,
-            #                                        rtype.as_smtlib(funstyle=False) ))
-
-            #    outstream.write("(assert (= %s " % name)
-            #    printer.printer(self.args[3])
-            #    outstream.write(")")
-            #else:
-            #    if dplus:
-            #        outstream.write("(declare-const %s %s)\n" % (name+'.l', REAL))
-            #        outstream.write("(declare-const %s %s)\n" % (name+'.u', REAL))
-            #        outstream.write("(assert (= %s %s))\n" % (name+'.l', name+'.u'))
-            #    else:
-            #        outstream.write("(declare-const %s %s)\n" % (name, REAL))
-            #    outstream.write("(declare-const %s %s)\n" % (name+'.p_nan', BOOL))
-
-            #    d = printer.printer(self.args[3])
-            #    if dplus:
-            #        outstream.write("(assert (= %s %s))\n" % (name+'.l', d+'.l'))
-            #        outstream.write("(assert (= %s %s))\n" % (name+'.u', d+'.u'))
-            #    else:
-            #        outstream.write("(assert (= %s %s))\n" % (name, d))
-            #    outstream.write("(assert (= %s %s))" % (name+'.p_nan', d+'.p_nan'))
+            params_list = self.args[1]
+            params = " ".join(["(%s %s)" % (v, v.symbol_type().as_smtlib(funstyle=False)) for v in params_list])
+            rtype = self.args[2]
+            expr = self.args[3]
+            outstream.write("(%s %s (%s) %s " % (self.name,
+                                                name,
+                                                params,
+                                                rtype.as_smtlib(funstyle=False)))
+            printer.printer(expr)
+            outstream.write(")")
 
         elif self.name in [smtcmd.PUSH, smtcmd.POP]:
             outstream.write("(%s %d)" % (self.name, self.args[0]))
@@ -295,12 +269,12 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
         elif self.name == smtcmd.DEFINE_SORT:
             name = self.args[0]
             params_list = self.args[1]
-            params = " ".join(params_list)
+            params = " ".join(x.as_smtlib(funstyle=False) for x in params_list)
             rtype = self.args[2]
             outstream.write("(%s %s (%s) %s)" % (self.name,
                                                  name,
                                                  params,
-                                                 rtype))
+                                                 rtype.as_smtlib(funstyle=False)))
         elif self.name == smtcmd.DECLARE_SORT:
             type_decl = self.args[0]
             outstream.write("(%s %s %d)" % (self.name,
@@ -315,7 +289,7 @@ class SmtLibCommand(namedtuple('SmtLibCommand', ['name', 'args'])):
             raise UnknownSmtLibCommandError(self.name)
 
     def serialize_to_string(self, daggify=True, decompose=False):
-        buf = cStringIO()
+        buf = StringIO()
         self.serialize(buf, daggify=daggify, decompose=decompose)
         return buf.getvalue()
 
@@ -396,10 +370,10 @@ class SmtLibScript(object):
                 stack = []
                 backtrack = []
             elif cmd.name == smtcmd.PUSH:
-                for _ in xrange(cmd.args[0]):
+                for _ in range(cmd.args[0]):
                     backtrack.append(len(stack))
             elif cmd.name == smtcmd.POP:
-                for _ in xrange(cmd.args[0]):
+                for _ in range(cmd.args[0]):
                     l = backtrack.pop()
                     stack = stack[:l]
 
@@ -415,9 +389,9 @@ class SmtLibScript(object):
         if decompose:
             printer = SmtDecomposePrinter(outstream, dplus=dplus, multi_prec=multi_prec)
         elif daggify:
-            printer = SmtDagPrinter(outstream, multi_prec=multi_prec)
+            printer = SmtDagPrinter(outstream, annotations=self.annotations, multi_prec=multi_prec)
         else:
-            printer = SmtPrinter(outstream, multi_prec=multi_prec)
+            printer = SmtPrinter(outstream, annotations=self.annotations, multi_prec=multi_prec)
 
         for cmd in self.commands:
             cmd.serialize(printer=printer, daggify=daggify, decompose=decompose, dplus=dplus, precs=precs, pr_pr=pr_pr)
@@ -487,7 +461,10 @@ def evaluate_command(cmd, solver):
         return solver.set_info(cmd.args[0], cmd.args[1])
 
     if cmd.name == smtcmd.SET_OPTION:
-        return solver.set_option(cmd.args[0], cmd.args[1])
+        opt = cmd.args[0]
+        if opt[0] == ':':
+            opt = opt[1:]
+        return solver.set_option(opt, cmd.args[1])
 
     elif cmd.name == smtcmd.ASSERT:
         return solver.assert_(cmd.args[0])
@@ -532,6 +509,9 @@ def evaluate_command(cmd, solver):
 
     elif cmd.name == smtcmd.GET_UNSAT_CORE:
         return solver.get_unsat_core()
+
+    elif cmd.name == smtcmd.GET_MODEL:
+        return solver.get_model()
 
     elif cmd.name == smtcmd.DECLARE_SORT:
         name = cmd.args[0].name
