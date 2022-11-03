@@ -3,7 +3,7 @@
 #
 from functools import partial
 
-from six.moves import xrange, cStringIO
+from io import StringIO
 
 import pysmt.operators as op
 from pysmt.environment import get_env
@@ -362,7 +362,7 @@ class SmtDecomposePrinter(DagWalker):
         self.openings += 1
         self.write("(let ((%s " % sym)
 
-        for _ in xrange((len(args) - 1) // 2):
+        for _ in range((len(args) - 1) // 2):
             self.write("(store ")
 
         self.write("((as const %s) " % formula.get_type().as_smtlib(False))
@@ -748,7 +748,7 @@ def to_smtlib(formula):
 
     See :py:class:`SmtPrinter`
     """
-    buf = cStringIO()
+    buf = StringIO()
     p = SmtDecomposePrinter(buf) 
     p.printer(formula)
     res = buf.getvalue()

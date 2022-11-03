@@ -1,3 +1,54 @@
+======================================================================
+Support for QF_FP and its encoding into real interval arithmetic (RIA)
+======================================================================
+
+This fork of pySMT experimentally implements a translator from ``QF_FP`` to a real interval arithmetic (RIA).
+The translated RIA formulas, which are embedded in ``QF_NRA`` or ``QF_LIRA``, approximate the rounding calculation of the original formulas.
+
+* ``pysmt/translators/r_fp.py``: Script that directly translate from ``QF_LRA`` or ``QF_NRA`` to ``QF_FP`` by simply replacing every RA construct with the FP counterpart.
+* ``pysmt/translators/r_rint.py``: Translator from ``QF_LRA`` or ``QF_NRA`` to real interval arithmetic, as if the resulting formulas approximate the FP formulas translated by the first script.
+* ``pysmt/translators/fp_rint.py``: Translator from ``QF_FP`` to real interval arithmetic.
+
+Examples
+========
+
+The ``examples`` directory contains example scripts.
+
+``examples/translate.py``
+-------------------------
+
+Top-level script for translation from RA to FP or RIA.
+
+Usage:
+
+.. code:: console
+    
+    $ python ./examples/translate.py -t FP ra_fml.smt2 > fp_fml.smt2
+
+``examples/translate_fp_rint.py``
+---------------------------------
+
+Top-level script for translation from FP to RIA.
+
+Usage:
+
+.. code:: console
+    
+    $ python ./examples/translate.py -t RInt -dm ra_fml.smt2 > ri_m_fml.smt2
+    $ python ./examples/translate.py -t RInt -dp ra_fml.smt2 > ri_p_fml.smt2
+
+Solver script
+=============
+
+The script ``examples/rint_incr_p.py`` implements a solver for real interval arithmetic.
+It is implemented using Z3Py (https://github.com/Z3Prover/z3).
+
+Usage:
+
+.. code:: console
+    
+    $ python ./examples/rint_incr_p.py ri_m_fml.smt2 ri_p_fml.smt2
+
 ===========================
 pySMT: a Python API for SMT
 ===========================
